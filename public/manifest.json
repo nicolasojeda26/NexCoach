@@ -1,0 +1,17 @@
+{
+  "short_name": "NexCoach Pro",
+  "name": "NexCoach Pro — Entrenamiento de Alto Rendimiento & Gestión",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "type": "image/svg+xml",
+      "sizes": "192x192 512x512",
+      "purpose": "any maskable"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#04070e",
+  "theme_color": "#04070e",
+  "display": "standalone",
+  "orientation": "portrait"
+}
