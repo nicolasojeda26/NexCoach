@@ -14,7 +14,7 @@ import {
   Award
 } from 'lucide-react';
 
-export default function HabitsNutritionView({ appState, currentRole }) {
+export default function HabitsNutritionView({ appState, currentRole, onUpdateHabits }) {
   const habits = appState.habitsData || {
     waterLiters: 2.5,
     waterTarget: 3.0,
@@ -28,23 +28,29 @@ export default function HabitsNutritionView({ appState, currentRole }) {
     checklist: []
   };
 
-  const [water, setWater] = useState(habits.waterLiters);
-  const [protein, setProtein] = useState(habits.proteinGrams);
-  const [steps, setSteps] = useState(habits.dailySteps);
-  const [sleep, setSleep] = useState(habits.sleepHours);
-  const [checklist, setChecklist] = useState(habits.checklist);
+  // Los valores se guardan en el estado global (antes se perdían al cambiar de pestaña).
+  const water = habits.waterLiters;
+  const protein = habits.proteinGrams;
+  const steps = habits.dailySteps;
+  const sleep = habits.sleepHours;
+  const checklist = habits.checklist || [];
+  const isStudent = currentRole === 'student';
 
   const toggleCheck = (id) => {
-    setChecklist(prev => prev.map(item => item.id === id ? { ...item, done: !item.done } : item));
+    if (!isStudent) return; // el profe solo supervisa
+    onUpdateHabits?.({ checklist: checklist.map(item => item.id === id ? { ...item, done: !item.done } : item) });
   };
 
   const addWater = (delta) => {
-    setWater(prev => Math.max(0, Math.round((prev + delta) * 10) / 10));
+    onUpdateHabits?.({ waterLiters: Math.max(0, Math.round((water + delta) * 100) / 100) });
   };
 
   const addProtein = (delta) => {
-    setProtein(prev => Math.max(0, prev + delta));
+    onUpdateHabits?.({ proteinGrams: Math.max(0, protein + delta) });
   };
+
+  const sleepPercent = Math.min(100, Math.round((sleep / (habits.sleepTarget || 8)) * 100));
+  const sleepLabel = sleep >= (habits.sleepTarget || 8) ? 'Óptimo' : sleep >= 7 ? 'Bueno' : 'Insuficiente';
 
   const waterPercent = Math.min(100, Math.round((water / habits.waterTarget) * 100));
   const proteinPercent = Math.min(100, Math.round((protein / habits.proteinTarget) * 100));
@@ -154,7 +160,7 @@ export default function HabitsNutritionView({ appState, currentRole }) {
           </div>
 
           <div>
-            <div className="text-2xl font-black text-white">{steps.toLocaleString()} <span className="text-sm font-normal text-slate-400">/ 10k</span></div>
+            <div className="text-2xl font-black text-white">{steps.toLocaleString('es-AR')} <span className="text-sm font-normal text-slate-400">/ {(habits.stepsTarget / 1000).toLocaleString('es-AR')}k</span></div>
             <div className="w-full bg-slate-800 h-1.5 rounded-full mt-2 overflow-hidden">
               <div className="bg-emerald-400 h-full rounded-full transition-all" style={{ width: `${stepsPercent}%` }} />
             </div>
@@ -170,13 +176,13 @@ export default function HabitsNutritionView({ appState, currentRole }) {
               <Moon className="w-4 h-4" />
               Descanso
             </span>
-            <span className="text-[10px] text-emerald-400 font-bold">Óptimo</span>
+            <span className={`text-[10px] font-bold ${sleepLabel === 'Insuficiente' ? 'text-rose-400' : 'text-emerald-400'}`}>{sleepLabel}</span>
           </div>
 
           <div>
-            <div className="text-2xl font-black text-white">{sleep} <span className="text-sm font-normal text-slate-400">hs</span></div>
+            <div className="text-2xl font-black text-white">{sleep} <span className="text-sm font-normal text-slate-400">/ {habits.sleepTarget} hs</span></div>
             <div className="w-full bg-slate-800 h-1.5 rounded-full mt-2 overflow-hidden">
-              <div className="bg-purple-400 h-full rounded-full transition-all" style={{ width: `94%` }} />
+              <div className="bg-purple-400 h-full rounded-full transition-all" style={{ width: `${sleepPercent}%` }} />
             </div>
           </div>
 
@@ -202,7 +208,9 @@ export default function HabitsNutritionView({ appState, currentRole }) {
               <button
                 key={item.id}
                 onClick={() => toggleCheck(item.id)}
-                className={`w-full flex items-center gap-3 p-3 rounded-2xl border text-left transition-all active:scale-98 ${
+                disabled={!isStudent}
+                aria-pressed={item.done}
+                className={`w-full flex items-center gap-3 p-3 rounded-2xl border text-left transition-all ${isStudent ? 'active:scale-[0.98]' : 'cursor-default'} ${
                   item.done
                     ? 'bg-emerald-500/10 border-emerald-500/30 text-white'
                     : 'bg-slate-950/80 border-slate-800 text-slate-400'
@@ -230,10 +238,12 @@ export default function HabitsNutritionView({ appState, currentRole }) {
             </h3>
             {currentRole === 'student' && (
               <button
-                onClick={() => alert("Función para adjuntar foto de plato activada. Puedes subir fotos para que el profe las supervise.")}
+                disabled
+                title="Próximamente: subir fotos requiere almacenamiento en la nube"
+                style={{ opacity: 0.5, cursor: 'not-allowed' }}
                 className="text-[11px] font-bold text-emerald-400 hover:text-emerald-300"
               >
-                + Subir Foto
+                + Subir Foto (pronto)
               </button>
             )}
           </div>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import Navbar from './components/Navbar';
 import Sidebar from './components/Sidebar';
 import BottomNav from './components/BottomNav';
@@ -21,6 +21,7 @@ import RoutineTemplatesView from './views/RoutineTemplatesView';
 import HabitsNutritionView from './views/HabitsNutritionView';
 
 import { loadAppState, saveAppState, resetAppState } from './data/storage';
+import { effectiveStatus, periodKey, todayISO, monthLabel, addMonthsISO } from './utils/helpers';
 
 export default function App() {
   const [appState, setAppState] = useState(loadAppState);
@@ -39,6 +40,20 @@ export default function App() {
     saveAppState(appState);
   }, [appState]);
 
+  // Estado derivado: las cuotas pendientes con vencimiento pasado se muestran como vencidas,
+  // y el estado de pago de cada alumno se calcula a partir de su cuota más reciente.
+  const viewState = useMemo(() => {
+    const today = todayISO();
+    const payments = appState.payments.map(p => ({ ...p, status: effectiveStatus(p, today) }));
+    const students = appState.students.map(s => {
+      const latest = payments
+        .filter(p => p.studentId === s.id)
+        .sort((a, b) => periodKey(b.monthPeriod) - periodKey(a.monthPeriod))[0];
+      return latest ? { ...s, paymentStatus: latest.status, nextDueDate: latest.status === 'paid' ? s.nextDueDate : latest.dueDate } : s;
+    });
+    return { ...appState, payments, students };
+  }, [appState]);
+
   // Role change logic
   const handleRoleChange = (role) => {
     setCurrentRole(role);
@@ -52,12 +67,14 @@ export default function App() {
     setAppState(prev => {
       const nextPayments = prev.payments.map(p => p.id === updatedPayment.id ? updatedPayment : p);
       
+      // El estado de pago del alumno se deriva de sus cuotas (ver viewState);
+      // acá solo se registra la fecha del último pago.
       const nextStudents = prev.students.map(s => {
-        if (s.id === updatedPayment.studentId && updatedPayment.monthPeriod.includes('Octubre')) {
+        if (s.id === updatedPayment.studentId && updatedPayment.status === 'paid') {
           return {
             ...s,
-            paymentStatus: updatedPayment.status,
-            lastPaymentDate: updatedPayment.paidDate || s.lastPaymentDate
+            lastPaymentDate: updatedPayment.paidDate || s.lastPaymentDate,
+            nextDueDate: addMonthsISO(updatedPayment.dueDate || todayISO(), 1)
           };
         }
         return s;
@@ -88,12 +105,30 @@ export default function App() {
     }));
   };
 
-  // Student handler
+  // Student handler: se agrega al final (el primer alumno es el que usa el Portal del Alumno)
+  // y se genera automáticamente su primera cuota pendiente.
   const handleAddStudent = (newStudent) => {
-    setAppState(prev => ({
-      ...prev,
-      students: [newStudent, ...prev.students]
-    }));
+    setAppState(prev => {
+      const plan = prev.plans.find(p => p.id === newStudent.planId);
+      const firstCharge = {
+        id: `pay-${Date.now()}`,
+        studentId: newStudent.id,
+        studentName: newStudent.name,
+        monthPeriod: monthLabel(),
+        amount: plan?.price || 0,
+        dueDate: newStudent.nextDueDate,
+        paidDate: null,
+        status: 'pending',
+        method: 'Transferencia Bancaria',
+        receiptUrl: null,
+        notes: 'Primera cuota generada al dar de alta al alumno.'
+      };
+      return {
+        ...prev,
+        students: [...prev.students, newStudent],
+        payments: [firstCharge, ...prev.payments]
+      };
+    });
   };
 
   // Anthropometry handler
@@ -132,15 +167,27 @@ export default function App() {
   // Routine Templates Handler
   const handleApplyTemplate = ({ templateId, studentId, mesoName }) => {
     setAppState(prev => {
-      const clonedDays = (prev.mesocycles[0]?.days || []).map(d => ({
+      const template = (prev.routineTemplates || []).find(t => t.id === templateId);
+      const student = prev.students.find(s => s.id === studentId);
+      const stamp = Date.now();
+      // Clonado profundo con IDs nuevos para que el mesociclo copiado sea independiente.
+      const clonedDays = (prev.mesocycles[0]?.days || []).map((d, dIdx) => ({
         ...d,
-        id: `day-${Date.now()}-${Math.random()}`
+        id: `day-${stamp}-${dIdx}`,
+        blocks: d.blocks.map((b, bIdx) => ({
+          ...b,
+          id: `b-${stamp}-${dIdx}-${bIdx}`,
+          exercises: b.exercises.map((e, eIdx) => ({ ...e, id: `e-${stamp}-${dIdx}-${bIdx}-${eIdx}` }))
+        }))
       }));
 
       const newMeso = {
-        id: `meso-${Date.now()}`,
+        id: `meso-${stamp}`,
         name: mesoName,
-        focus: `Plan basado en plantilla ${templateId}`,
+        focus: template ? `${template.name} — ${template.description}` : 'Plan basado en plantilla',
+        templateId,
+        studentId,
+        studentName: student?.name || null,
         days: clonedDays
       };
 
@@ -149,6 +196,22 @@ export default function App() {
         mesocycles: [...prev.mesocycles, newMeso]
       };
     });
+  };
+
+  // Hábitos del alumno (agua, proteína, checklist) persistidos
+  const handleUpdateHabits = (patch) => {
+    setAppState(prev => ({
+      ...prev,
+      habitsData: { ...prev.habitsData, ...patch }
+    }));
+  };
+
+  // Registro de sesiones de entrenamiento finalizadas
+  const handleSaveWorkoutSession = (session) => {
+    setAppState(prev => ({
+      ...prev,
+      workoutLogs: [session, ...(prev.workoutLogs || [])]
+    }));
   };
 
   // Reset demo data handler
@@ -175,8 +238,9 @@ export default function App() {
       <Navbar
         currentRole={currentRole}
         setCurrentRole={handleRoleChange}
-        appState={appState}
+        appState={viewState}
         onResetData={handleResetData}
+        onOpenBadges={() => setIsBadgesModalOpen(true)}
       />
 
       {/* Main Container */}
@@ -187,7 +251,7 @@ export default function App() {
             currentTab={currentTab}
             setCurrentTab={setCurrentTab}
             currentRole={currentRole}
-            appState={appState}
+            appState={viewState}
             onOpenReport={() => setIsReportModalOpen(true)}
             onOpenBadges={() => setIsBadgesModalOpen(true)}
           />
@@ -197,7 +261,7 @@ export default function App() {
         <main className="flex-1 p-3.5 sm:p-6 lg:p-8 overflow-y-auto pb-24 md:pb-8">
           {currentTab === 'dashboard' && (
             <DashboardView
-              appState={appState}
+              appState={viewState}
               setCurrentTab={setCurrentTab}
               setSelectedVideo={setSelectedVideo}
               currentRole={currentRole}
@@ -208,16 +272,18 @@ export default function App() {
 
           {currentTab === 'workout' && (
             <WorkoutView
-              appState={appState}
+              appState={viewState}
               setSelectedVideo={setSelectedVideo}
               activeWorkoutDay={activeWorkoutDay}
               mesoName={activeMesoName}
+              onSaveSession={handleSaveWorkoutSession}
+              onExit={() => setCurrentTab('dashboard')}
             />
           )}
 
           {currentTab === 'routines' && (
             <RoutinesView
-              appState={appState}
+              appState={viewState}
               setSelectedVideo={setSelectedVideo}
               onStartWorkout={handleStartWorkout}
             />
@@ -225,7 +291,7 @@ export default function App() {
 
           {currentTab === 'feedback' && (
             <TechniqueFeedbackView
-              appState={appState}
+              appState={viewState}
               currentRole={currentRole}
               onAddSubmission={handleAddSubmission}
               onReviewSubmission={handleReviewSubmission}
@@ -235,49 +301,50 @@ export default function App() {
 
           {currentTab === 'habits' && (
             <HabitsNutritionView
-              appState={appState}
+              appState={viewState}
               currentRole={currentRole}
+              onUpdateHabits={handleUpdateHabits}
             />
           )}
 
           {currentTab === 'templates' && (
             <RoutineTemplatesView
-              appState={appState}
+              appState={viewState}
               onApplyTemplate={handleApplyTemplate}
             />
           )}
 
           {currentTab === 'students' && (
             <StudentsView
-              appState={appState}
+              appState={viewState}
               onAddStudent={handleAddStudent}
             />
           )}
 
           {currentTab === 'anthropometry' && (
             <AnthropometryView
-              appState={appState}
+              appState={viewState}
               onAddMeasurement={handleAddMeasurement}
             />
           )}
 
           {currentTab === 'strength' && (
             <StrengthProgressView
-              appState={appState}
+              appState={viewState}
               onAddStrengthLog={handleAddStrengthLog}
             />
           )}
 
           {currentTab === 'videos' && (
             <VideoLibraryView
-              appState={appState}
+              appState={viewState}
               setSelectedVideo={setSelectedVideo}
             />
           )}
 
           {currentTab === 'payments' && (
             <PaymentsView
-              appState={appState}
+              appState={viewState}
               onUpdatePayment={handleUpdatePayment}
               onAddPayment={handleAddPayment}
               onUpdateCoachInfo={handleUpdateCoachInfo}
@@ -292,7 +359,7 @@ export default function App() {
         currentTab={currentTab}
         setCurrentTab={setCurrentTab}
         currentRole={currentRole}
-        appState={appState}
+        appState={viewState}
         onOpenReport={() => setIsReportModalOpen(true)}
         onOpenBadges={() => setIsBadgesModalOpen(true)}
       />
@@ -310,14 +377,14 @@ export default function App() {
       <ReportModal
         isOpen={isReportModalOpen}
         onClose={() => setIsReportModalOpen(false)}
-        appState={appState}
+        appState={viewState}
       />
 
       {/* Gamification & PR Badges Modal */}
       <PRBadgesModal
         isOpen={isBadgesModalOpen}
         onClose={() => setIsBadgesModalOpen(false)}
-        appState={appState}
+        appState={viewState}
       />
     </div>
   );

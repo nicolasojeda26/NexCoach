@@ -61,7 +61,7 @@ export default function Logo({ variant = 'full', className = '' }) {
   }
 
   return (
-    <div className={`flex items-center gap-3 ${className}`}>
+    <div className={`flex items-center gap-2 sm:gap-3 min-w-0 ${className}`}>
       {/* Icon Emblem */}
       <div className="relative group cursor-pointer">
         <div className="absolute -inset-1 rounded-2xl bg-gradient-to-tr from-volt-neon/40 to-cyber-glow/30 blur-md opacity-70 group-hover:opacity-100 transition-opacity" />
@@ -103,11 +103,11 @@ export default function Logo({ variant = 'full', className = '' }) {
           <span className="text-lg font-black tracking-tighter text-white uppercase font-display leading-none">
             NEX<span className="text-volt-neon">COACH</span>
           </span>
-          <span className="text-[9px] font-black tracking-widest px-1.5 py-0.5 rounded bg-volt-neon/15 text-volt-neon border border-volt-neon/30 uppercase leading-none">
+          <span className="hidden min-[400px]:inline text-[9px] font-black tracking-widest px-1.5 py-0.5 rounded bg-volt-neon/15 text-volt-neon border border-volt-neon/30 uppercase leading-none">
             ELITE
           </span>
         </div>
-        <span className="text-[10px] font-bold tracking-wider text-slate-400 uppercase mt-0.5">
+        <span className="text-[10px] font-bold tracking-wider text-slate-400 uppercase mt-0.5 whitespace-nowrap">
           PF LARROCA • 2026
         </span>
       </div>

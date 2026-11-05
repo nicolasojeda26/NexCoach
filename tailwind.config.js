@@ -50,6 +50,7 @@ export default {
         'pulse-glow': 'pulseGlow 2.5s infinite ease-in-out',
         'float': 'float 4s infinite ease-in-out',
         'shimmer': 'shimmer 2.5s infinite linear',
+        'fadeIn': 'fadeIn 0.25s ease-out',
       },
       keyframes: {
         pulseGlow: {
@@ -59,6 +60,11 @@ export default {
         float: {
           '0%, 100%': { transform: 'translateY(0)' },
           '50%': { transform: 'translateY(-6px)' },
+        },
+        fadeIn: {
+          // Solo opacidad: un transform en el contenedor rompería los modales "fixed" internos.
+          '0%': { opacity: '0' },
+          '100%': { opacity: '1' },
         },
         shimmer: {
           '0%': { backgroundPosition: '-200% 0' },

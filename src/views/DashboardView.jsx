@@ -18,20 +18,35 @@ import {
   ShieldCheck,
   ChevronRight
 } from 'lucide-react';
+import { latestPeriod, formatDate } from '../utils/helpers';
 
 export default function DashboardView({ appState, setCurrentTab, setSelectedVideo, currentRole, onOpenReport, onOpenBadges }) {
   const currentStudent = appState.students[0]; // Agostina Baju
   const totalStudents = appState.students.length;
 
+  // Caja del período más reciente con cuotas cargadas (antes estaba fijo en "Octubre").
+  const activePeriod = latestPeriod(appState.payments);
+  const activeMonthName = activePeriod.split(' ')[0];
+
   const totalCollected = appState.payments
-    .filter(p => p.status === 'paid' && p.monthPeriod.includes('Octubre'))
+    .filter(p => p.status === 'paid' && p.monthPeriod === activePeriod)
     .reduce((acc, p) => acc + p.amount, 0);
 
   const totalPending = appState.payments
-    .filter(p => (p.status === 'pending' || p.status === 'overdue') && p.monthPeriod.includes('Octubre'))
+    .filter(p => (p.status === 'pending' || p.status === 'overdue') && p.monthPeriod === activePeriod)
     .reduce((acc, p) => acc + p.amount, 0);
 
   const overdueCount = appState.payments.filter(p => p.status === 'overdue').length;
+
+  // Estado de cuota de la alumna del portal
+  const studentUnpaid = appState.payments
+    .filter(p => p.studentId === currentStudent.id && p.status !== 'paid')
+    .sort((a, b) => (a.dueDate || '').localeCompare(b.dueDate || ''))[0];
+  const studentLastPaid = appState.payments
+    .filter(p => p.studentId === currentStudent.id && p.status === 'paid')
+    .sort((a, b) => (b.paidDate || '').localeCompare(a.paidDate || ''))[0];
+
+  const recentSessions = (appState.workoutLogs || []).slice(0, 3);
 
   return (
     <div className="space-y-6 sm:space-y-8 animate-fadeIn pb-24 safe-area-bottom">
@@ -152,18 +167,26 @@ export default function DashboardView({ appState, setCurrentTab, setSelectedVide
         <div className="p-4 sm:p-5 rounded-3xl bg-dark-900/90 border border-slate-800/90 border-glow-hover flex flex-col justify-between shadow-xl group">
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
-              {currentRole === 'coach' ? 'Caja Octubre' : 'Cuota Octubre'}
+              {currentRole === 'coach' ? `Caja ${activeMonthName}` : `Cuota ${(studentUnpaid || studentLastPaid)?.monthPeriod.split(' ')[0] || ''}`}
             </span>
             <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-400 group-hover:scale-110 transition-transform">
               <CreditCard className="w-4 h-4" />
             </div>
           </div>
           <div>
-            <div className="text-2xl sm:text-3xl font-black text-emerald-400 tracking-tight">
-              {currentRole === 'coach' ? `$${totalCollected.toLocaleString('es-AR')}` : 'Al Día'}
+            <div className={`text-2xl sm:text-3xl font-black tracking-tight ${
+              currentRole === 'coach' || !studentUnpaid ? 'text-emerald-400' : studentUnpaid.status === 'overdue' ? 'text-rose-400' : 'text-amber-400'
+            }`}>
+              {currentRole === 'coach'
+                ? `$${totalCollected.toLocaleString('es-AR')}`
+                : !studentUnpaid ? 'Al Día' : studentUnpaid.status === 'overdue' ? 'Vencida' : 'Pendiente'}
             </div>
             <p className="text-[11px] text-slate-400 mt-1">
-              {currentRole === 'coach' ? `Por cobrar: $${totalPending.toLocaleString('es-AR')}` : 'Abonado vía Transferencia'}
+              {currentRole === 'coach'
+                ? `Por cobrar: $${totalPending.toLocaleString('es-AR')}`
+                : studentUnpaid
+                  ? `$${studentUnpaid.amount.toLocaleString('es-AR')} • vence ${formatDate(studentUnpaid.dueDate)}`
+                  : studentLastPaid ? `Abonado vía ${studentLastPaid.method}` : 'Sin cuotas registradas'}
             </p>
           </div>
         </div>
@@ -317,7 +340,9 @@ export default function DashboardView({ appState, setCurrentTab, setSelectedVide
               <div>
                 <h3 className="text-base font-black text-white">{currentStudent.name}</h3>
                 <p className="text-xs text-slate-400">{currentStudent.age} años • {currentStudent.height} cm • {currentStudent.gender}</p>
-                <span className="text-[10px] text-volt-neon font-black block mt-0.5">PLAN 5X SEMANA FULL</span>
+                <span className="text-[10px] text-volt-neon font-black block mt-0.5 uppercase">
+                  {appState.plans.find(pl => pl.id === currentStudent.planId)?.name || 'Plan personalizado'}
+                </span>
               </div>
             </div>
 
@@ -361,20 +386,45 @@ export default function DashboardView({ appState, setCurrentTab, setSelectedVide
                 >
                   🥗 Hábitos & Agua
                 </button>
+                {currentRole === 'coach' ? (
                 <button
                   onClick={() => setCurrentTab('templates')}
                   className="p-2.5 rounded-xl bg-dark-950 border border-slate-800 hover:border-volt-neon/40 text-left font-bold text-slate-200 hover:text-volt-neon transition-colors"
                 >
                   📚 Plantillas 1-Clic
                 </button>
+                ) : (
+                <button
+                  onClick={() => setCurrentTab('strength')}
+                  className="p-2.5 rounded-xl bg-dark-950 border border-slate-800 hover:border-volt-neon/40 text-left font-bold text-slate-200 hover:text-volt-neon transition-colors"
+                >
+                  🏋️ Mi Fuerza
+                </button>
+                )}
                 <button
                   onClick={() => setCurrentTab('payments')}
                   className="p-2.5 rounded-xl bg-dark-950 border border-slate-800 hover:border-volt-neon/40 text-left font-bold text-slate-200 hover:text-volt-neon transition-colors"
                 >
-                  💳 Control de Caja
+                  {currentRole === 'coach' ? '💳 Control de Caja' : '💳 Mi Cuota'}
                 </button>
               </div>
             </div>
+
+            {/* Últimas sesiones registradas desde "Entrenar Hoy" */}
+            {recentSessions.length > 0 && (
+              <div className="pt-2 border-t border-slate-800 space-y-2">
+                <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Últimas sesiones registradas:</span>
+                {recentSessions.map(ses => (
+                  <div key={ses.id} className="p-2.5 rounded-xl bg-dark-950 border border-slate-800 text-[11px] flex items-center justify-between gap-2">
+                    <div>
+                      <strong className="text-white block">{ses.dayName} • {formatDate(ses.date)}</strong>
+                      <span className="text-slate-400">{ses.completedSets}/{ses.totalSets} series • {Math.round(ses.durationSeconds / 60)} min</span>
+                    </div>
+                    <span className="px-2 py-0.5 rounded-full bg-volt-neon/10 text-volt-neon border border-volt-neon/30 font-black shrink-0">RPE {ses.rpe}</span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </div>

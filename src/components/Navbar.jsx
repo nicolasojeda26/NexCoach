@@ -16,12 +16,12 @@ export default function Navbar({ currentRole, setCurrentRole, appState, onResetD
 
   return (
     <header className="sticky top-0 z-30 bg-dark-950/80 backdrop-blur-2xl border-b border-slate-800/80 px-3.5 sm:px-6 py-2.5">
-      <div className="flex items-center justify-between max-w-7xl mx-auto">
+      <div className="flex items-center justify-between gap-2 max-w-7xl mx-auto">
         {/* Brand with New Custom Logo */}
         <Logo variant="full" />
 
         {/* Center / Right controls */}
-        <div className="flex items-center gap-2 sm:gap-3">
+        <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
           {/* Athlete Streak Indicator */}
           <button
             onClick={onOpenBadges}
@@ -35,24 +35,24 @@ export default function Navbar({ currentRole, setCurrentRole, appState, onResetD
           <div className="flex items-center bg-dark-900/90 p-1 rounded-2xl border border-slate-800 shadow-inner">
             <button
               onClick={() => setCurrentRole('coach')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-black text-[11px] sm:text-xs transition-all ${
+              className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl font-black text-[11px] sm:text-xs transition-all ${
                 currentRole === 'coach'
                   ? 'bg-gradient-to-r from-volt-neon to-emerald-400 text-slate-950 shadow-lg shadow-volt-glow/25'
                   : 'text-slate-400 hover:text-slate-200'
               }`}
             >
-              <ShieldCheck className="w-3.5 h-3.5" />
+              <ShieldCheck className="w-3.5 h-3.5 hidden sm:block" />
               <span>Profe</span>
             </button>
             <button
               onClick={() => setCurrentRole('student')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-black text-[11px] sm:text-xs transition-all ${
+              className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl font-black text-[11px] sm:text-xs transition-all ${
                 currentRole === 'student'
                   ? 'bg-gradient-to-r from-volt-neon to-emerald-400 text-slate-950 shadow-lg shadow-volt-glow/25'
                   : 'text-slate-400 hover:text-slate-200'
               }`}
             >
-              <UserCheck className="w-3.5 h-3.5" />
+              <UserCheck className="w-3.5 h-3.5 hidden sm:block" />
               <span>Alumna</span>
             </button>
           </div>

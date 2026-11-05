@@ -24,7 +24,10 @@ export default function StrengthProgressView({ appState, onAddStrengthLog }) {
   const [calcReps, setCalcReps] = useState(6);
 
   // Epley formula: 1RM = Weight * (1 + Reps / 30)
-  const estimated1RM = Math.round(calcWeight * (1 + calcReps / 30));
+  // Con 1 repetición el 1RM es la carga misma; se ignoran valores negativos o vacíos.
+  const safeWeight = Math.max(0, Number(calcWeight) || 0);
+  const safeReps = Math.max(1, Math.round(Number(calcReps) || 1));
+  const estimated1RM = safeReps === 1 ? Math.round(safeWeight) : Math.round(safeWeight * (1 + safeReps / 30));
 
   const strengthLogs = appState.strengthProgression;
   const firstLog = strengthLogs[0];
@@ -147,7 +150,7 @@ export default function StrengthProgressView({ appState, onAddStrengthLog }) {
           </div>
 
           <button
-            onClick={() => setIsModalOpen(true)}
+            onClick={() => { setNewMonthName(`Mes ${strengthLogs.length + 1}`); setIsModalOpen(true); }}
             className="btn-volt flex items-center justify-center gap-2 px-5 py-3 rounded-2xl text-xs font-black shadow-lg shadow-volt/20 hover:scale-[1.02] transition-all self-start md:self-auto"
           >
             <Plus className="w-4 h-4 stroke-[3]" />
@@ -225,6 +228,8 @@ export default function StrengthProgressView({ appState, onAddStrengthLog }) {
                 <span className="text-slate-400 text-[10px] font-mono">CARGA LEVANTADA (KG):</span>
                 <input
                   type="number"
+                  min="0"
+                  inputMode="decimal"
                   value={calcWeight}
                   onChange={(e) => setCalcWeight(Number(e.target.value))}
                   className="w-full mt-1 p-2 rounded-xl bg-obsidian border border-slate-700 text-white font-mono font-bold text-center text-sm focus:outline-none focus:border-cyan-400"
@@ -234,6 +239,9 @@ export default function StrengthProgressView({ appState, onAddStrengthLog }) {
                 <span className="text-slate-400 text-[10px] font-mono">REPETICIONES (REPS):</span>
                 <input
                   type="number"
+                  min="1"
+                  max="30"
+                  inputMode="numeric"
                   value={calcReps}
                   onChange={(e) => setCalcReps(Number(e.target.value))}
                   className="w-full mt-1 p-2 rounded-xl bg-obsidian border border-slate-700 text-white font-mono font-bold text-center text-sm focus:outline-none focus:border-cyan-400"
@@ -561,6 +569,7 @@ export default function StrengthProgressView({ appState, onAddStrengthLog }) {
                     <input
                       type="number"
                       step="0.5"
+                      min="0"
                       value={formStrength[key]}
                       onChange={(e) => setFormStrength({ ...formStrength, [key]: e.target.value })}
                       className="w-full p-2.5 rounded-xl bg-obsidian-surface border border-slate-700 text-white font-mono focus:outline-none focus:border-volt"

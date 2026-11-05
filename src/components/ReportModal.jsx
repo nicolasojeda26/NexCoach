@@ -25,14 +25,28 @@ export default function ReportModal({ isOpen, onClose, appState }) {
   const firstLog = strengthLogs[0];
   const latestLog = strengthLogs[strengthLogs.length - 1];
 
+  // Ganancias calculadas desde los registros (antes estaban escritas a mano y no
+  // se actualizaban al cargar un mes nuevo de fuerza).
+  const gain = (key) => {
+    const a = Number(firstLog?.[key]) || 0;
+    const b = Number(latestLog?.[key]) || 0;
+    return { a, b, pct: a > 0 ? (((b - a) / a) * 100).toFixed(1) : '0.0' };
+  };
+  const squat = gain('sentadillaProfunda');
+  const deadlift = gain('pesoMuerto');
+  const bench = gain('pressPlano');
+  const volume = gain('totalKilos');
+  const volumePct = Math.round(Number(volume.pct));
+  const periodLabel = `${firstLog?.mes || ''} – ${latestLog?.mes || ''}`;
+
   const handlePrint = () => {
     window.print();
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/85 backdrop-blur-md overflow-y-auto animate-fadeIn">
+    <div className="report-overlay fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/85 backdrop-blur-md overflow-y-auto animate-fadeIn">
       {/* Dialog container */}
-      <div className="bg-slate-900 border border-slate-700 w-full max-w-3xl rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[92vh] my-auto">
+      <div className="report-dialog bg-slate-900 border border-slate-700 w-full max-w-3xl rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[92vh] my-auto">
         {/* Top Control Bar (Hidden when printing) */}
         <div className="flex items-center justify-between p-4 bg-slate-950 border-b border-slate-800 print:hidden shrink-0">
           <div className="flex items-center gap-2">
@@ -80,7 +94,7 @@ export default function ReportModal({ isOpen, onClose, appState }) {
 
             <div className="sm:text-right text-xs text-slate-400 print:text-slate-600 space-y-0.5">
               <div><strong>Preparador Físico:</strong> Prof. {coach.name}</div>
-              <div><strong>Período evaluado:</strong> Febrero - Octubre 2026</div>
+              <div><strong>Período evaluado:</strong> {periodLabel} • {firstMeso?.mesociclo} a {lastMeso?.mesociclo}</div>
               <div><strong>Fecha de emisión:</strong> {new Date().toLocaleDateString('es-AR')}</div>
             </div>
           </div>
@@ -172,29 +186,29 @@ export default function ReportModal({ isOpen, onClose, appState }) {
           <div className="space-y-3">
             <div className="flex items-center gap-2 text-xs font-bold text-emerald-400 print:text-emerald-800 uppercase tracking-wider">
               <TrendingUp className="w-4 h-4" />
-              <span>2. Sobrecarga Progresiva & RMs (Kilos Movidos: +48%)</span>
+              <span>2. Sobrecarga Progresiva & RMs (Kilos Movidos: {volumePct >= 0 ? '+' : ''}{volumePct}%)</span>
             </div>
 
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
               <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 print:bg-slate-50 print:border-slate-200">
                 <span className="text-[10px] text-slate-400 print:text-slate-500 block">Sentadilla Profunda</span>
-                <span className="text-base font-black text-white print:text-black">55 kg ➔ 67.5 kg</span>
-                <span className="text-[10px] text-emerald-400 print:text-emerald-700 font-bold block">+22.7% de ganancia</span>
+                <span className="text-base font-black text-white print:text-black">{squat.a} kg ➔ {squat.b} kg</span>
+                <span className="text-[10px] text-emerald-400 print:text-emerald-700 font-bold block">{squat.pct}% de ganancia</span>
               </div>
               <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 print:bg-slate-50 print:border-slate-200">
                 <span className="text-[10px] text-slate-400 print:text-slate-500 block">Peso Muerto</span>
-                <span className="text-base font-black text-white print:text-black">40 kg ➔ 52.5 kg</span>
-                <span className="text-[10px] text-emerald-400 print:text-emerald-700 font-bold block">+31.2% de ganancia</span>
+                <span className="text-base font-black text-white print:text-black">{deadlift.a} kg ➔ {deadlift.b} kg</span>
+                <span className="text-[10px] text-emerald-400 print:text-emerald-700 font-bold block">{deadlift.pct}% de ganancia</span>
               </div>
               <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 print:bg-slate-50 print:border-slate-200">
                 <span className="text-[10px] text-slate-400 print:text-slate-500 block">Banco Plano</span>
-                <span className="text-base font-black text-white print:text-black">34.5 kg ➔ 42.5 kg</span>
-                <span className="text-[10px] text-emerald-400 print:text-emerald-700 font-bold block">+23.1% de ganancia</span>
+                <span className="text-base font-black text-white print:text-black">{bench.a} kg ➔ {bench.b} kg</span>
+                <span className="text-[10px] text-emerald-400 print:text-emerald-700 font-bold block">{bench.pct}% de ganancia</span>
               </div>
               <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 print:bg-slate-50 print:border-slate-200">
                 <span className="text-[10px] text-slate-400 print:text-slate-500 block">Volumen Total</span>
-                <span className="text-base font-black text-emerald-400 print:text-emerald-700">219 kg ➔ 324 kg</span>
-                <span className="text-[10px] text-emerald-400 print:text-emerald-700 font-bold block">+105 kg movidos</span>
+                <span className="text-base font-black text-emerald-400 print:text-emerald-700">{volume.a} kg ➔ {volume.b} kg</span>
+                <span className="text-[10px] text-emerald-400 print:text-emerald-700 font-bold block">{volume.b - volume.a >= 0 ? '+' : ''}{Math.round((volume.b - volume.a) * 10) / 10} kg movidos</span>
               </div>
             </div>
           </div>

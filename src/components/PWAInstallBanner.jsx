@@ -2,12 +2,22 @@ import React, { useState, useEffect } from 'react';
 import { Download, X, Smartphone, Check } from 'lucide-react';
 
 export default function PWAInstallBanner() {
-  const [showBanner, setShowBanner] = useState(true);
+  // No volver a mostrar el banner si la app ya está instalada o si el usuario lo cerró.
+  const [showBanner, setShowBanner] = useState(() => {
+    try {
+      const standalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
+      return !standalone && localStorage.getItem('nexcoach_pwa_banner_dismissed') !== '1';
+    } catch (e) { return true; }
+  });
+  const dismiss = () => {
+    setShowBanner(false);
+    try { localStorage.setItem('nexcoach_pwa_banner_dismissed', '1'); } catch (e) { /* noop */ }
+  };
   const [isInstalled, setIsInstalled] = useState(false);
 
   const handleInstallClick = () => {
     alert("Para instalar NexCoach en tu celular:\n\n• En iPhone (Safari): Toca el botón 'Compartir' (cuadrado con flecha) y selecciona 'Agregar a pantalla de inicio'.\n• En Android (Chrome): Toca los 3 puntos superiores y selecciona 'Instalar aplicación' o 'Agregar a la pantalla principal'.");
-    setShowBanner(false);
+    dismiss();
   };
 
   if (!showBanner) return null;
@@ -19,7 +29,7 @@ export default function PWAInstallBanner() {
           <Smartphone className="w-3.5 h-3.5" />
         </span>
         <span className="text-[11px] text-slate-300 truncate">
-          <strong className="text-white font-bold">Instala NexCoach</strong> en tu celular para acceder sin conexión y entrenar más cómodo.
+          <strong className="text-white font-bold">Instala NexCoach</strong> en tu celular para abrirla como una app y entrenar más cómodo.
         </span>
       </div>
 
@@ -32,7 +42,8 @@ export default function PWAInstallBanner() {
           <span>Instalar</span>
         </button>
         <button
-          onClick={() => setShowBanner(false)}
+          onClick={dismiss}
+          aria-label="Cerrar aviso de instalación"
           className="p-1 text-slate-500 hover:text-slate-300"
         >
           <X className="w-3.5 h-3.5" />

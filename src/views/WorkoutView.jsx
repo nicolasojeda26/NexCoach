@@ -15,25 +15,49 @@ import {
   Clock
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
+import { todayISO } from '../utils/helpers';
 
-export default function WorkoutView({ appState, setSelectedVideo, activeWorkoutDay, mesoName }) {
+// Progreso de la sesión en curso guardado en el dispositivo, para no perderlo
+// si la alumna cambia de pestaña o se le bloquea el celular en pleno entrenamiento.
+const sessionKey = (dayId) => `nexcoach_workout_${dayId}`;
+function loadSession(dayId) {
+  try {
+    const raw = localStorage.getItem(sessionKey(dayId));
+    return raw ? JSON.parse(raw) : null;
+  } catch (e) { return null; }
+}
+
+export default function WorkoutView({ appState, setSelectedVideo, activeWorkoutDay, mesoName, onSaveSession, onExit }) {
   const currentMeso = appState.mesocycles[0];
   const currentDay = activeWorkoutDay || currentMeso.days[0];
+  const [saved] = useState(() => loadSession(currentDay.id));
 
   // State of completed sets: key: "exId-roundIndex", val: boolean
-  const [completedSets, setCompletedSets] = useState({});
-  const [weightsUsed, setWeightsUsed] = useState({});
-  const [workoutFinished, setWorkoutFinished] = useState(false);
-  const [rpeScore, setRpeScore] = useState(7);
-  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const [completedSets, setCompletedSets] = useState(saved?.completedSets || {});
+  const [weightsUsed, setWeightsUsed] = useState(saved?.weightsUsed || {});
+  const [workoutFinished, setWorkoutFinished] = useState(!!saved?.finished);
+  const [rpeScore, setRpeScore] = useState(saved?.rpe || 7);
+  const [startedAt, setStartedAt] = useState(saved?.startedAt || Date.now());
+  const [finishedAt, setFinishedAt] = useState(saved?.finishedAt || null);
+  const [now, setNow] = useState(Date.now());
 
-  // Live session elapsed timer
+  // Cronómetro de la sesión: se basa en la hora de inicio (sigue siendo exacto aunque
+  // la pestaña quede en segundo plano) y se detiene al finalizar.
   useEffect(() => {
-    const timer = setInterval(() => {
-      setElapsedSeconds(prev => prev + 1);
-    }, 1000);
+    if (workoutFinished) return undefined;
+    const timer = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(timer);
-  }, []);
+  }, [workoutFinished]);
+  const elapsedSeconds = Math.max(0, Math.floor(((finishedAt || now) - startedAt) / 1000));
+
+  // Guardar el progreso en curso
+  useEffect(() => {
+    try {
+      localStorage.setItem(sessionKey(currentDay.id), JSON.stringify({
+        completedSets, weightsUsed, finished: workoutFinished, rpe: rpeScore, startedAt, finishedAt
+      }));
+    } catch (e) { /* sin acceso a storage */ }
+  }, [currentDay.id, completedSets, weightsUsed, workoutFinished, rpeScore, startedAt, finishedAt]);
 
   const formatElapsed = (sec) => {
     const m = Math.floor(sec / 60);
@@ -71,6 +95,7 @@ export default function WorkoutView({ appState, setSelectedVideo, activeWorkoutD
 
   const handleFinishWorkout = () => {
     setWorkoutFinished(true);
+    setFinishedAt(Date.now());
     try {
       confetti({
         particleCount: 120,
@@ -84,7 +109,33 @@ export default function WorkoutView({ appState, setSelectedVideo, activeWorkoutD
 
   const handleResetWorkout = () => {
     setCompletedSets({});
+    setWeightsUsed({});
     setWorkoutFinished(false);
+    setFinishedAt(null);
+    setStartedAt(Date.now());
+    setNow(Date.now());
+  };
+
+  const handleSaveAndExit = () => {
+    const loads = {};
+    currentDay.blocks.forEach(b => b.exercises.forEach(ex => {
+      if (weightsUsed[ex.id] !== undefined) loads[ex.name] = weightsUsed[ex.id];
+    }));
+    onSaveSession?.({
+      id: `session-${Date.now()}`,
+      date: todayISO(),
+      studentId: appState.students[0]?.id,
+      mesoName: mesoName || currentMeso.name,
+      dayName: currentDay.name,
+      focus: currentDay.focus,
+      durationSeconds: elapsedSeconds,
+      completedSets: completedCount,
+      totalSets: totalRounds,
+      rpe: rpeScore,
+      loads
+    });
+    try { localStorage.removeItem(sessionKey(currentDay.id)); } catch (e) { /* noop */ }
+    onExit?.();
   };
 
   return (
@@ -169,7 +220,7 @@ export default function WorkoutView({ appState, setSelectedVideo, activeWorkoutD
 
           <div className="pt-2 flex justify-center gap-2.5">
             <button
-              onClick={() => alert(`¡Sesión guardada con éxito! RPE: ${rpeScore}. El profesor ya puede ver tu asistencia en el dashboard.`)}
+              onClick={handleSaveAndExit}
               className="px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs shadow-lg shadow-emerald-500/20 transition-all active:scale-95"
             >
               Guardar y Salir
@@ -318,7 +369,7 @@ export default function WorkoutView({ appState, setSelectedVideo, activeWorkoutD
 
       {/* Floating Finish Button */}
       {!workoutFinished && (
-        <div className="fixed bottom-20 left-0 right-0 z-30 flex justify-center px-4 pointer-events-none">
+        <div className="fixed bottom-[5.5rem] md:bottom-6 left-0 md:left-64 right-0 z-30 flex justify-center pl-4 pr-28 md:pr-80 pointer-events-none">
           <button
             onClick={handleFinishWorkout}
             disabled={completedCount === 0}

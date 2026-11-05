@@ -20,6 +20,7 @@ import {
   TrendingUp,
   Sparkles
 } from 'lucide-react';
+import { todayISO, addMonthsISO, formatDate } from '../utils/helpers';
 
 export default function StudentsView({ appState, onAddStudent }) {
   const [selectedStudentId, setSelectedStudentId] = useState(appState.students[0].id);
@@ -28,7 +29,7 @@ export default function StudentsView({ appState, onAddStudent }) {
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   // New Student Form State
-  const [formData, setFormData] = useState({
+  const emptyForm = {
     name: '',
     email: '',
     phone: '',
@@ -37,9 +38,14 @@ export default function StudentsView({ appState, onAddStudent }) {
     height: 165,
     currentWeight: 60,
     targetWeight: 63,
-    planId: 'plan-2',
+    planId: appState.plans[0]?.id || 'plan-1',
     notes: ''
-  });
+  };
+  const [formData, setFormData] = useState(emptyForm);
+  const openNewStudentModal = () => {
+    setFormData(emptyForm);
+    setIsModalOpen(true);
+  };
 
   const selectedStudent = appState.students.find(s => s.id === selectedStudentId) || appState.students[0];
 
@@ -60,11 +66,12 @@ export default function StudentsView({ appState, onAddStudent }) {
     const imc = Number(calculateIMC(formData.currentWeight, formData.height));
     const targetImc = Number(calculateIMC(formData.targetWeight, formData.height));
 
+    const today = todayISO();
     const newStudent = {
       id: `std-${Date.now()}`,
-      name: formData.name,
-      email: formData.email,
-      phone: formData.phone || '+5491100000000',
+      name: formData.name.trim(),
+      email: formData.email.trim(),
+      phone: formData.phone.trim(),
       age: Number(formData.age),
       gender: formData.gender,
       height: Number(formData.height),
@@ -77,14 +84,15 @@ export default function StudentsView({ appState, onAddStudent }) {
         : "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=150",
       planId: formData.planId,
       status: "active",
-      startDate: new Date().toISOString().split('T')[0],
+      startDate: today,
       notes: formData.notes || "Objetivo de acondicionamiento físico.",
       avgFatigue: 7.0,
       weeklyHours: 5.0,
       monthlyHours: 20,
-      paymentStatus: "paid",
-      lastPaymentDate: new Date().toISOString().split('T')[0],
-      nextDueDate: "2026-11-05"
+      // Alumno nuevo: queda con su primera cuota pendiente (se genera automáticamente)
+      paymentStatus: "pending",
+      lastPaymentDate: null,
+      nextDueDate: addMonthsISO(today, 0)
     };
 
     onAddStudent(newStudent);
@@ -112,7 +120,7 @@ export default function StudentsView({ appState, onAddStudent }) {
           </div>
 
           <button
-            onClick={() => setIsModalOpen(true)}
+            onClick={openNewStudentModal}
             className="btn-volt flex items-center justify-center gap-2 px-5 py-3 rounded-2xl text-xs font-black shadow-lg shadow-volt/20 hover:scale-[1.02] transition-all self-start md:self-auto"
           >
             <UserPlus className="w-4 h-4 stroke-[3]" />
@@ -246,11 +254,11 @@ export default function StudentsView({ appState, onAddStudent }) {
                   <div>
                     <h2 className="text-xl font-black text-white">{selectedStudent.name}</h2>
                     <p className="text-xs text-slate-400 font-mono mt-0.5">
-                      {selectedStudent.gender} • {selectedStudent.age} años • Ingreso: {selectedStudent.startDate}
+                      {selectedStudent.gender} • {selectedStudent.age} años • Ingreso: {formatDate(selectedStudent.startDate)}
                     </p>
                     <div className="flex items-center gap-2 mt-2">
                       <a
-                        href={`https://wa.me/${selectedStudent.phone.replace(/[^0-9]/g, '')}?text=Hola%20${encodeURIComponent(selectedStudent.name)},%20te%20escribo%20del%20equipo%20de%20NexCoach%20para%20tu%20plan%20de%20entrenamiento!`}
+                        href={`https://wa.me/${(selectedStudent.phone || '').replace(/[^0-9]/g, '')}?text=${encodeURIComponent(`Hola ${selectedStudent.name}, te escribo del equipo de NexCoach para tu plan de entrenamiento!`)}`}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-volt/10 hover:bg-volt/20 text-volt text-xs font-mono font-bold border border-volt/30 transition-all hover:scale-[1.02]"
@@ -258,13 +266,13 @@ export default function StudentsView({ appState, onAddStudent }) {
                         <MessageCircle className="w-3.5 h-3.5" />
                         <span>WhatsApp Directo</span>
                       </a>
-                      <a
+                      {selectedStudent.email && <a
                         href={`mailto:${selectedStudent.email}`}
                         className="p-1.5 rounded-xl bg-obsidian-surface hover:bg-slate-800 text-slate-300 text-xs border border-slate-800 transition-colors"
                         title="Enviar correo"
                       >
                         <Mail className="w-3.5 h-3.5" />
-                      </a>
+                      </a>}
                     </div>
                   </div>
                 </div>
@@ -275,7 +283,7 @@ export default function StudentsView({ appState, onAddStudent }) {
                     {appState.plans.find(p => p.id === selectedStudent.planId)?.name || 'Plan Personalizado'}
                   </span>
                   <span className="text-sm font-black text-volt font-mono block mt-1">
-                    ${appState.plans.find(p => p.id === selectedStudent.planId)?.price.toLocaleString('es-AR')} / mes
+                    ${(appState.plans.find(p => p.id === selectedStudent.planId)?.price || 0).toLocaleString('es-AR')} / mes
                   </span>
                 </div>
               </div>
@@ -386,10 +394,24 @@ export default function StudentsView({ appState, onAddStudent }) {
                     value={formData.phone}
                     onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                     placeholder="+54911..."
+                    inputMode="tel"
+                    pattern="[+]?[0-9\s-]{8,}"
+                    title="Ingresá el número con código de área, ej: +5491155443322"
                     className="w-full p-2.5 rounded-xl bg-obsidian-surface border border-slate-700 text-white focus:outline-none focus:border-volt"
                     required
                   />
                 </div>
+              </div>
+
+              <div>
+                <label className="block text-slate-300 font-bold mb-1">Email (opcional):</label>
+                <input
+                  type="email"
+                  value={formData.email}
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  placeholder="alumno@email.com"
+                  className="w-full p-2.5 rounded-xl bg-obsidian-surface border border-slate-700 text-white focus:outline-none focus:border-volt"
+                />
               </div>
 
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -399,6 +421,7 @@ export default function StudentsView({ appState, onAddStudent }) {
                     type="number"
                     value={formData.age}
                     onChange={(e) => setFormData({ ...formData, age: e.target.value })}
+                    min="10" max="100"
                     className="w-full p-2.5 rounded-xl bg-obsidian-surface border border-slate-700 text-white font-mono"
                     required
                   />
@@ -420,6 +443,7 @@ export default function StudentsView({ appState, onAddStudent }) {
                     type="number"
                     value={formData.height}
                     onChange={(e) => setFormData({ ...formData, height: e.target.value })}
+                    min="100" max="230"
                     className="w-full p-2.5 rounded-xl bg-obsidian-surface border border-slate-700 text-white font-mono"
                     required
                   />
@@ -430,9 +454,27 @@ export default function StudentsView({ appState, onAddStudent }) {
                     type="number"
                     value={formData.currentWeight}
                     onChange={(e) => setFormData({ ...formData, currentWeight: e.target.value })}
+                    min="25" max="250" step="0.1"
                     className="w-full p-2.5 rounded-xl bg-obsidian-surface border border-slate-700 text-white font-mono"
                     required
                   />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-300 font-bold mb-1">Peso objetivo (kg):</label>
+                  <input
+                    type="number"
+                    value={formData.targetWeight}
+                    onChange={(e) => setFormData({ ...formData, targetWeight: e.target.value })}
+                    min="25" max="250" step="0.1"
+                    className="w-full p-2.5 rounded-xl bg-obsidian-surface border border-slate-700 text-white font-mono"
+                    required
+                  />
+                </div>
+                <div className="flex items-end text-[11px] text-slate-400 pb-2">
+                  IMC estimado: {formData.height > 0 ? calculateIMC(formData.currentWeight, formData.height) : '—'}
                 </div>
               </div>
 

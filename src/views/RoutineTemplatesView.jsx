@@ -15,12 +15,19 @@ export default function RoutineTemplatesView({ appState, onApplyTemplate }) {
   const [selectedTemplate, setSelectedTemplate] = useState(null);
   const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
   const [selectedStudentId, setSelectedStudentId] = useState(appState.students[0].id);
-  const [mesoTargetName, setMesoTargetName] = useState('Mesociclo 8 (Noviembre)');
+  const [mesoTargetName, setMesoTargetName] = useState('');
+  const [assignedMessage, setAssignedMessage] = useState(null);
 
   const templates = appState.routineTemplates || [];
 
   const handleOpenAssign = (tmpl) => {
     setSelectedTemplate(tmpl);
+    // Siguiente número de mesociclo según los existentes (ej: si hay un "Mesociclo 7", propone el 8)
+    const maxNum = appState.mesocycles.reduce((max, m) => {
+      const n = Number((m.name.match(/Mesociclo\s+(\d+)/i) || [])[1]);
+      return n > max ? n : max;
+    }, 0);
+    setMesoTargetName(`Mesociclo ${maxNum + 1} — ${tmpl.name.split(' (')[0]}`);
     setIsAssignModalOpen(true);
   };
 
@@ -34,7 +41,8 @@ export default function RoutineTemplatesView({ appState, onApplyTemplate }) {
       mesoName: mesoTargetName
     });
 
-    alert(`¡Plantilla "${selectedTemplate.name}" asignada con éxito a ${appState.students.find(s => s.id === selectedStudentId)?.name} para ${mesoTargetName}!`);
+    setAssignedMessage(`Plantilla "${selectedTemplate.name}" asignada a ${appState.students.find(s => s.id === selectedStudentId)?.name} como "${mesoTargetName}". Ya la ves en Rutinas & Mesociclos.`);
+    setTimeout(() => setAssignedMessage(null), 5000);
     setIsAssignModalOpen(false);
   };
 
@@ -56,6 +64,13 @@ export default function RoutineTemplatesView({ appState, onApplyTemplate }) {
           </p>
         </div>
       </div>
+
+      {assignedMessage && (
+        <div role="status" className="p-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs font-semibold flex items-center gap-2">
+          <CheckCircle2 className="w-4 h-4 shrink-0" />
+          <span>{assignedMessage}</span>
+        </div>
+      )}
 
       {/* Templates Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -135,7 +150,7 @@ export default function RoutineTemplatesView({ appState, onApplyTemplate }) {
                   className="w-full p-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white focus:outline-none focus:border-emerald-500"
                 >
                   {appState.students.map(s => (
-                    <option key={s.id} value={s.id}>{s.name} ({s.email})</option>
+                    <option key={s.id} value={s.id}>{s.name}{s.email ? ` (${s.email})` : ''}</option>
                   ))}
                 </select>
               </div>

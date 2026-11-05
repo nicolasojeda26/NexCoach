@@ -126,7 +126,7 @@ export default function AnthropometryView({ appState, onAddMeasurement }) {
           </div>
 
           <button
-            onClick={() => setIsModalOpen(true)}
+            onClick={() => { setNewMesoName(`Mesociclo ${anthropometry.length + 1}`); setIsModalOpen(true); }}
             className="btn-volt flex items-center justify-center gap-2 px-5 py-3 rounded-2xl text-xs font-black shadow-lg shadow-volt/20 hover:scale-[1.02] transition-all self-start md:self-auto"
           >
             <Plus className="w-4 h-4 stroke-[3]" />
@@ -506,6 +506,7 @@ export default function AnthropometryView({ appState, onAddMeasurement }) {
                     <input
                       type="number"
                       step="0.1"
+                      min="1"
                       value={formData[key]}
                       onChange={(e) => setFormData({ ...formData, [key]: e.target.value })}
                       className="w-full p-2.5 rounded-xl bg-obsidian-surface border border-slate-700 text-white font-mono focus:outline-none focus:border-volt"

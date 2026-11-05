@@ -1,9 +1,21 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Timer, Play, Pause, RotateCcw, Volume2, Plus, Minus, Bell } from 'lucide-react';
 
+// Un único AudioContext reutilizado: los navegadores limitan la cantidad de contextos
+// y, si se crea uno por pitido, el sonido deja de funcionar después de unos minutos.
+let sharedAudioCtx = null;
+function getAudioCtx() {
+  const Ctx = window.AudioContext || window.webkitAudioContext;
+  if (!Ctx) return null;
+  if (!sharedAudioCtx) sharedAudioCtx = new Ctx();
+  if (sharedAudioCtx.state === 'suspended') sharedAudioCtx.resume().catch(() => {});
+  return sharedAudioCtx;
+}
+
 function playBeep(freq = 880, duration = 0.2) {
   try {
-    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const audioCtx = getAudioCtx();
+    if (!audioCtx) return;
     const osc = audioCtx.createOscillator();
     const gain = audioCtx.createGain();
     osc.type = 'sine';
@@ -23,34 +35,36 @@ export default function RestTimer() {
   const [secondsLeft, setSecondsLeft] = useState(60);
   const [initialDuration, setInitialDuration] = useState(60);
   const [isRunning, setIsRunning] = useState(false);
-  const [isMinimized, setIsMinimized] = useState(false);
+  // En celular arranca minimizado para no tapar el contenido ni la barra inferior.
+  const [isMinimized, setIsMinimized] = useState(
+    () => typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches
+  );
   const timerRef = useRef(null);
 
+  // Cuenta regresiva (sin efectos secundarios dentro del setState).
   useEffect(() => {
-    if (isRunning && secondsLeft > 0) {
-      timerRef.current = setInterval(() => {
-        setSecondsLeft(prev => {
-          if (prev <= 1) {
-            clearInterval(timerRef.current);
-            setIsRunning(false);
-            // Play completion chime
-            playBeep(880, 0.2);
-            setTimeout(() => playBeep(1174, 0.4), 250);
-            return 0;
-          }
-          if (prev === 4 || prev === 3 || prev === 2) {
-            playBeep(659, 0.1);
-          }
-          return prev - 1;
-        });
-      }, 1000);
-    } else {
-      clearInterval(timerRef.current);
-    }
+    if (!isRunning) return undefined;
+    timerRef.current = setInterval(() => {
+      setSecondsLeft(prev => Math.max(0, prev - 1));
+    }, 1000);
     return () => clearInterval(timerRef.current);
-  }, [isRunning, secondsLeft]);
+  }, [isRunning]);
+
+  // Pitidos de aviso y fin del descanso.
+  useEffect(() => {
+    if (!isRunning) return;
+    if (secondsLeft === 0) {
+      setIsRunning(false);
+      playBeep(880, 0.2);
+      setTimeout(() => playBeep(1174, 0.4), 250);
+      if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+    } else if (secondsLeft <= 3) {
+      playBeep(659, 0.1);
+    }
+  }, [secondsLeft, isRunning]);
 
   const handleStart = () => {
+    getAudioCtx(); // habilita el audio con el toque del usuario (requisito de iOS/Chrome)
     if (secondsLeft === 0) setSecondsLeft(initialDuration);
     setIsRunning(true);
   };
@@ -76,7 +90,7 @@ export default function RestTimer() {
   const presets = [30, 60, 90, 120];
 
   return (
-    <div className="fixed bottom-6 right-6 z-40">
+    <div className="fixed bottom-[5.5rem] right-3 md:bottom-6 md:right-6 z-40">
       {isMinimized ? (
         <button
           onClick={() => setIsMinimized(false)}
@@ -90,7 +104,7 @@ export default function RestTimer() {
           <span>{formatTime(secondsLeft)}</span>
         </button>
       ) : (
-        <div className="bg-slate-900/95 border border-slate-700/80 rounded-2xl p-4 shadow-2xl backdrop-blur-md w-72 text-slate-100 flex flex-col gap-3">
+        <div className="bg-slate-900/95 border border-slate-700/80 rounded-2xl p-4 shadow-2xl backdrop-blur-md w-[min(18rem,calc(100vw-1.5rem))] text-slate-100 flex flex-col gap-3">
           {/* Header */}
           <div className="flex items-center justify-between pb-2 border-b border-slate-800">
             <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-emerald-400">

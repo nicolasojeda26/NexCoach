@@ -14,6 +14,7 @@ import {
   ExternalLink,
   UserCheck
 } from 'lucide-react';
+import { getYouTubeId, todayISO } from '../utils/helpers';
 
 export default function TechniqueFeedbackView({ appState, currentRole, onAddSubmission, onReviewSubmission, setSelectedVideo }) {
   const [isSubmitModalOpen, setIsSubmitModalOpen] = useState(false);
@@ -34,16 +35,16 @@ export default function TechniqueFeedbackView({ appState, currentRole, onAddSubm
     e.preventDefault();
     if (!videoUrl) return;
 
-    // extract youtube id if youtube link
-    const ytMatch = videoUrl.match(/(?:shorts\/|v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
-    const youtubeId = ytMatch ? ytMatch[1] : '9EC044QlmtE';
+    // Si es YouTube se embebe; si es Drive/Loom/otro, se muestra el enlace
+    // (antes se mostraba un video de demo que no tenía nada que ver).
+    const youtubeId = getYouTubeId(videoUrl);
 
     const newSub = {
       id: `tech-${Date.now()}`,
       studentId: "std-1",
       studentName: "Agostina Baju",
       exerciseName,
-      submittedDate: new Date().toISOString().split('T')[0],
+      submittedDate: todayISO(),
       videoUrl,
       youtubeId,
       studentNotes,
@@ -64,10 +65,11 @@ export default function TechniqueFeedbackView({ appState, currentRole, onAddSubm
       coachFeedback: coachNotes || "¡Excelente ejecución! Sigue así.",
       rating: coachRating,
       status: "reviewed",
-      reviewedAt: new Date().toISOString().split('T')[0]
+      reviewedAt: todayISO()
     });
     setSelectedReviewItem(null);
     setCoachNotes('');
+    setCoachRating('Excelente');
   };
 
   const handleShareCorrectionOnWhatsApp = (sub) => {
@@ -157,12 +159,24 @@ export default function TechniqueFeedbackView({ appState, currentRole, onAddSubm
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {/* Video Player Box */}
                 <div className="relative aspect-video rounded-2xl bg-black overflow-hidden border border-slate-800 flex items-center justify-center group">
-                  <iframe
-                    src={`https://www.youtube.com/embed/${sub.youtubeId}?autoplay=0`}
-                    title={sub.exerciseName}
-                    className="w-full h-full border-0"
-                    allowFullScreen
-                  />
+                  {sub.youtubeId ? (
+                    <iframe
+                      src={`https://www.youtube.com/embed/${sub.youtubeId}?autoplay=0`}
+                      title={sub.exerciseName}
+                      className="w-full h-full border-0"
+                      allowFullScreen
+                    />
+                  ) : (
+                    <a
+                      href={sub.videoUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex flex-col items-center gap-2 text-xs font-bold text-emerald-400 hover:underline p-4 text-center"
+                    >
+                      <span className="text-2xl">▶</span>
+                      <span>Abrir video (Drive / Loom / otro)</span>
+                    </a>
+                  )}
                 </div>
 
                 {/* Student's note & Coach feedback */}

@@ -79,7 +79,7 @@ export default function RoutinesView({ appState, setSelectedVideo, onStartWorkou
                 {activeMesocycle.name}
               </span>
               <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-slate-800 text-slate-300">
-                FASE ACTIVA
+                {activeMesocycle.studentName ? `ASIGNADO A ${activeMesocycle.studentName.toUpperCase()}` : 'FASE ACTIVA'}
               </span>
             </div>
             <span className="text-sm md:text-base font-bold text-white block mt-0.5">

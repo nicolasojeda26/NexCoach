@@ -1,15 +1,23 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { X, ExternalLink, Play, Lightbulb } from 'lucide-react';
 
 export default function VideoModal({ video, onClose }) {
+  // Cerrar con la tecla Escape
+  useEffect(() => {
+    if (!video) return undefined;
+    const onKey = (e) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [video, onClose]);
+
   if (!video) return null;
 
   // Transform YouTube watch or shorts URL to embed URL
   let embedUrl = `https://www.youtube.com/embed/${video.youtubeId}?autoplay=1`;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn">
-      <div className="bg-slate-900 border border-slate-700 w-full max-w-lg rounded-2xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn" onClick={onClose} role="dialog" aria-modal="true" aria-label={video.name}>
+      <div className="bg-slate-900 border border-slate-700 w-full max-w-lg rounded-2xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-slate-800 bg-slate-900/90">
           <div className="flex items-center gap-2">
@@ -23,6 +31,7 @@ export default function VideoModal({ video, onClose }) {
           </div>
           <button
             onClick={onClose}
+            aria-label="Cerrar video"
             className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
           >
             <X className="w-5 h-5" />
