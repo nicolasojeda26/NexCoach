@@ -16,7 +16,12 @@ import {
 } from 'lucide-react';
 import { getYouTubeId, todayISO } from '../utils/helpers';
 
-export default function TechniqueFeedbackView({ appState, currentRole, onAddSubmission, onReviewSubmission, setSelectedVideo }) {
+export default function TechniqueFeedbackView({ appState, currentRole, onAddSubmission, onReviewSubmission, setSelectedVideo, uploadFile, mode }) {
+  const [videoFile, setVideoFile] = useState(null);
+  const [uploadPct, setUploadPct] = useState(null);
+  const [submitError, setSubmitError] = useState(null);
+  const coachLabel = appState.coach.name ? `el Prof. ${appState.coach.name}` : 'tu profe';
+  const student = appState.activeStudent;
   const [isSubmitModalOpen, setIsSubmitModalOpen] = useState(false);
   const [selectedReviewItem, setSelectedReviewItem] = useState(null);
 
@@ -31,21 +36,38 @@ export default function TechniqueFeedbackView({ appState, currentRole, onAddSubm
 
   const submissions = appState.techniqueSubmissions || [];
 
-  const handleStudentSubmit = (e) => {
+  const handleStudentSubmit = async (e) => {
     e.preventDefault();
-    if (!videoUrl) return;
+    if ((!videoUrl && !videoFile) || !student) return;
+    setSubmitError(null);
 
-    // Si es YouTube se embebe; si es Drive/Loom/otro, se muestra el enlace
-    // (antes se mostraba un video de demo que no tenía nada que ver).
-    const youtubeId = getYouTubeId(videoUrl);
+    // Video subido desde el celular (modo nube) o link de YouTube/Drive/Loom.
+    let finalUrl = videoUrl;
+    let videoFileUrl = null;
+    let storagePath = null;
+    if (videoFile) {
+      try {
+        setUploadPct(0);
+        const res = await uploadFile('technique', student.id, videoFile, setUploadPct);
+        finalUrl = res.url; videoFileUrl = res.url; storagePath = res.path;
+      } catch (err) {
+        setSubmitError(err.message);
+        setUploadPct(null);
+        return;
+      }
+      setUploadPct(null);
+    }
+    const youtubeId = videoFileUrl ? null : getYouTubeId(finalUrl);
 
     const newSub = {
       id: `tech-${Date.now()}`,
-      studentId: "std-1",
-      studentName: "Agostina Baju",
+      studentId: student.id,
+      studentName: student.name,
       exerciseName,
       submittedDate: todayISO(),
-      videoUrl,
+      videoUrl: finalUrl,
+      videoFileUrl,
+      storagePath,
       youtubeId,
       studentNotes,
       status: "pending",
@@ -57,6 +79,7 @@ export default function TechniqueFeedbackView({ appState, currentRole, onAddSubm
     onAddSubmission(newSub);
     setIsSubmitModalOpen(false);
     setVideoUrl('');
+    setVideoFile(null);
     setStudentNotes('');
   };
 
@@ -94,13 +117,13 @@ export default function TechniqueFeedbackView({ appState, currentRole, onAddSubm
               Corrección de Técnica por Video
             </h1>
             <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
-              Feedback con IA & Profe
+              Corrección del profe
             </span>
           </div>
           <p className="text-xs text-slate-400 mt-1">
             {currentRole === 'coach'
               ? 'Revisa las ejecuciones enviadas por los alumnos y devuelve correcciones con marcas de tiempo.'
-              : 'Graba tu serie, sube el enlace y recibe corrección directa del Prof. Nicolás Larroca.'}
+              : `Grabá tu serie, mandá el video y recibí la corrección de ${coachLabel}.`}
           </p>
         </div>
 
@@ -159,7 +182,9 @@ export default function TechniqueFeedbackView({ appState, currentRole, onAddSubm
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {/* Video Player Box */}
                 <div className="relative aspect-video rounded-2xl bg-black overflow-hidden border border-slate-800 flex items-center justify-center group">
-                  {sub.youtubeId ? (
+                  {sub.videoFileUrl ? (
+                    <video src={sub.videoFileUrl} controls playsInline preload="metadata" className="w-full h-full object-contain bg-black" aria-label={sub.exerciseName} />
+                  ) : sub.youtubeId ? (
                     <iframe
                       src={`https://www.youtube.com/embed/${sub.youtubeId}?autoplay=0`}
                       title={sub.exerciseName}
@@ -194,7 +219,7 @@ export default function TechniqueFeedbackView({ appState, currentRole, onAddSubm
                       <div className="flex items-center justify-between">
                         <span className="text-[10px] text-emerald-400 font-black uppercase tracking-wider flex items-center gap-1">
                           <Sparkles className="w-3 h-3" />
-                          Devolución del Prof. Nicolás Larroca:
+                          Devolución de {appState.coach.name ? `Prof. ${appState.coach.name}` : 'tu profe'}:
                         </span>
                         <span className="text-[10px] text-slate-400">Revisado: {sub.reviewedAt}</span>
                       </div>
@@ -303,14 +328,24 @@ export default function TechniqueFeedbackView({ appState, currentRole, onAddSubm
               </div>
 
               <div>
-                <label className="block text-slate-300 font-semibold mb-1">Enlace del Video (YouTube / Shorts / Drive / Loom):</label>
+                {mode === 'cloud' && (
+                  <div className="mb-3">
+                    <label className="block text-slate-300 font-semibold mb-1" htmlFor="video-file">Subí el video desde tu celular (hasta 50 MB):</label>
+                    <input id="video-file" type="file" accept="video/*" capture="environment"
+                      onChange={(e) => { setVideoFile(e.target.files?.[0] || null); if (e.target.files?.[0]) setVideoUrl(''); }}
+                      className="w-full text-[11px] text-slate-300 file:mr-2 file:px-3 file:py-1.5 file:rounded-lg file:border-0 file:bg-emerald-500 file:text-slate-950 file:font-bold" />
+                    <span className="block text-center text-[10px] text-slate-500 mt-2">o pegá un link</span>
+                  </div>
+                )}
+                <label className="block text-slate-300 font-semibold mb-1" htmlFor="video-url">Enlace del Video (YouTube / Shorts / Drive / Loom):</label>
                 <input
+                  id="video-url"
                   type="url"
                   value={videoUrl}
-                  onChange={(e) => setVideoUrl(e.target.value)}
+                  onChange={(e) => { setVideoUrl(e.target.value); if (e.target.value) setVideoFile(null); }}
                   placeholder="https://www.youtube.com/shorts/..."
                   className="w-full p-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white focus:outline-none focus:border-emerald-500"
-                  required
+                  required={!videoFile}
                 />
               </div>
 
@@ -326,6 +361,7 @@ export default function TechniqueFeedbackView({ appState, currentRole, onAddSubm
               </div>
             </div>
 
+            {submitError && <p role="alert" className="text-xs text-rose-400 font-semibold">{submitError}</p>}
             <div className="flex items-center justify-end gap-2 pt-2">
               <button
                 type="button"
@@ -336,9 +372,10 @@ export default function TechniqueFeedbackView({ appState, currentRole, onAddSubm
               </button>
               <button
                 type="submit"
-                className="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-bold"
+                disabled={uploadPct !== null}
+                className="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-bold disabled:opacity-60"
               >
-                Enviar al Profesor
+                {uploadPct !== null ? `Subiendo ${uploadPct}%` : 'Enviar al Profesor'}
               </button>
             </div>
           </form>

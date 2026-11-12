@@ -1,0 +1,25 @@
+rules_version = '2';
+
+// Fotos de comidas y videos de técnica: solo los ven el profe y el alumno dueño.
+service firebase.storage {
+  match /b/{bucket}/o {
+    function profile() {
+      return firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data;
+    }
+    function canAccess(coachId, sid) {
+      return request.auth != null && (
+        request.auth.uid == coachId
+        || (profile().role == 'student' && profile().coachId == coachId && profile().studentId == sid)
+      );
+    }
+
+    match /coaches/{coachId}/students/{sid}/{kind}/{file} {
+      allow read: if canAccess(coachId, sid);
+      allow create: if canAccess(coachId, sid)
+        && kind in ['meals', 'technique']
+        && request.resource.size < 50 * 1024 * 1024
+        && (request.resource.contentType.matches('image/.*') || request.resource.contentType.matches('video/.*'));
+      allow delete: if request.auth != null && request.auth.uid == coachId;
+    }
+  }
+}

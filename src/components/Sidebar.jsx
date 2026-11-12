@@ -95,7 +95,7 @@ export default function Sidebar({ currentTab, setCurrentTab, currentRole, appSta
   const visibleItems = menuItems.filter(item => item.roles.includes(currentRole));
 
   return (
-    <aside className="w-full md:w-64 bg-obsidian-card/70 md:border-r border-slate-800/80 p-4 shrink-0 flex flex-col justify-between backdrop-blur-md">
+    <aside aria-label="Menú principal" className="w-full md:w-64 bg-obsidian-card/70 md:border-r border-slate-800/80 p-4 shrink-0 flex flex-col justify-between backdrop-blur-md">
       <nav className="flex md:flex-col gap-1.5 overflow-x-auto md:overflow-visible pb-2 md:pb-0">
         {visibleItems.map(item => {
           const Icon = item.icon;
@@ -104,16 +104,17 @@ export default function Sidebar({ currentTab, setCurrentTab, currentRole, appSta
             <button
               key={item.id}
               onClick={() => setCurrentTab(item.id)}
+              aria-current={isActive ? 'page' : undefined}
               className={`flex items-center justify-between px-3.5 py-2.5 rounded-2xl font-semibold text-xs md:text-sm whitespace-nowrap transition-all ${
                 isActive
                   ? 'bg-volt text-obsidian font-black shadow-lg shadow-volt/20 scale-[1.02]'
                   : item.highlight
-                  ? 'bg-volt/10 text-volt hover:bg-volt/20 border border-volt/20'
+                  ? 'text-volt hover:bg-volt/10'
                   : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
               }`}
             >
               <div className="flex items-center gap-3">
-                <Icon className={`w-4 h-4 md:w-5 md:h-5 ${isActive ? 'text-obsidian' : item.highlight ? 'text-volt' : 'text-slate-400'}`} />
+                <Icon aria-hidden="true" className={`w-4 h-4 md:w-5 md:h-5 ${isActive ? 'text-obsidian' : item.highlight ? 'text-volt' : 'text-slate-400'}`} />
                 <span>{item.label}</span>
               </div>
               {item.badge && (

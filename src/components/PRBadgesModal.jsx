@@ -11,17 +11,14 @@ import {
   Dumbbell
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
+import { useEscape } from '../hooks/useEscape';
 
 export default function PRBadgesModal({ isOpen, onClose, appState }) {
+  useEscape(isOpen, onClose);
   if (!isOpen) return null;
 
-  const gamification = appState.gamification || {
-    level: 5,
-    levelTitle: "Atleta Avanzada",
-    totalXP: 2450,
-    personalRecords: [],
-    badges: []
-  };
+  // Todo calculado con los datos del alumno activo (sesiones, fuerza, videos, medidas).
+  const gamification = appState.progress;
 
   const handleCelebrate = () => {
     try {
@@ -53,12 +50,13 @@ export default function PRBadgesModal({ isOpen, onClose, appState }) {
               <Crown className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="text-base font-black text-white">Récords Personales (PRs) & Medallas</h3>
+              <h3 className="text-base font-black text-white">Récords y Medallas{appState.activeStudent ? ` • ${appState.activeStudent.name}` : ''}</h3>
               <span className="text-[11px] text-emerald-400 font-bold">Nivel {gamification.level} • {gamification.levelTitle}</span>
             </div>
           </div>
           <button
             onClick={onClose}
+            aria-label="Cerrar"
             className="p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800"
           >
             <X className="w-5 h-5" />
@@ -70,7 +68,9 @@ export default function PRBadgesModal({ isOpen, onClose, appState }) {
           <div>
             <span className="text-[10px] text-amber-400 font-bold uppercase tracking-wider block">Puntos de Experiencia</span>
             <span className="text-2xl font-black text-white">{gamification.totalXP} XP</span>
-            <span className="text-[11px] text-slate-400 block mt-0.5">Próximo nivel en 550 XP</span>
+            <span className="text-[11px] text-slate-400 block mt-0.5">
+              Próximo nivel en {gamification.nextLevelXP - gamification.totalXP} XP • {gamification.streakWeeks} semanas en racha • {gamification.attendancePct}% asistencia
+            </span>
           </div>
           <button
             onClick={handleCelebrate}
@@ -84,7 +84,7 @@ export default function PRBadgesModal({ isOpen, onClose, appState }) {
         {/* Unlocked Badges */}
         <div className="space-y-2.5">
           <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">
-            Medallas Desbloqueadas ({gamification.badges.filter(b => b.unlocked).length}):
+            Medallas ({gamification.badges.filter(b => b.unlocked).length} de {gamification.badges.length} desbloqueadas):
           </span>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
@@ -93,7 +93,7 @@ export default function PRBadgesModal({ isOpen, onClose, appState }) {
               return (
                 <div
                   key={b.id}
-                  className="p-3 rounded-2xl bg-slate-950 border border-slate-800/80 flex items-start gap-3 hover:border-amber-500/40 transition-colors"
+                  className={`p-3 rounded-2xl bg-slate-950 border border-slate-800/80 flex items-start gap-3 hover:border-amber-500/40 transition-colors ${b.unlocked ? '' : 'opacity-45 grayscale'}`}
                 >
                   <div className="p-2 rounded-xl bg-amber-500/10 text-amber-400 shrink-0 mt-0.5">
                     <Icon className="w-4 h-4" />
@@ -101,7 +101,9 @@ export default function PRBadgesModal({ isOpen, onClose, appState }) {
                   <div>
                     <h4 className="text-xs font-bold text-white leading-tight">{b.title}</h4>
                     <p className="text-[10px] text-slate-400 mt-0.5 leading-snug">{b.desc}</p>
-                    <span className="text-[9px] text-emerald-400 font-semibold block mt-1">Conseguido: {b.date}</span>
+                    <span className={`text-[9px] font-semibold block mt-1 ${b.unlocked ? 'text-emerald-400' : 'text-slate-500'}`}>
+                      {b.unlocked ? 'Desbloqueada' : `Bloqueada${b.progress ? ` • ${b.progress}` : ''}`}
+                    </span>
                   </div>
                 </div>
               );
@@ -116,6 +118,9 @@ export default function PRBadgesModal({ isOpen, onClose, appState }) {
           </span>
 
           <div className="space-y-1.5">
+            {gamification.personalRecords.length === 0 && (
+              <p className="text-xs text-slate-500">Todavía no hay registros de fuerza.</p>
+            )}
             {gamification.personalRecords.map((pr, idx) => (
               <div
                 key={idx}

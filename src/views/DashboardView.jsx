@@ -18,11 +18,14 @@ import {
   ShieldCheck,
   ChevronRight
 } from 'lucide-react';
-import { latestPeriod, formatDate } from '../utils/helpers';
+import { latestPeriod, formatDate, addDaysISO, todayISO } from '../utils/helpers';
+import Avatar from '../components/Avatar';
 
 export default function DashboardView({ appState, setCurrentTab, setSelectedVideo, currentRole, onOpenReport, onOpenBadges }) {
-  const currentStudent = appState.students[0]; // Agostina Baju
-  const totalStudents = appState.students.length;
+  const currentStudent = appState.activeStudent;
+  const scoped = appState.scoped;
+  const progress = appState.progress;
+  const totalStudents = appState.students.filter(s => s.status !== 'inactive').length;
 
   // Caja del período más reciente con cuotas cargadas (antes estaba fijo en "Octubre").
   const activePeriod = latestPeriod(appState.payments);
@@ -40,13 +43,49 @@ export default function DashboardView({ appState, setCurrentTab, setSelectedVide
 
   // Estado de cuota de la alumna del portal
   const studentUnpaid = appState.payments
-    .filter(p => p.studentId === currentStudent.id && p.status !== 'paid')
+    .filter(p => p.studentId === currentStudent?.id && p.status !== 'paid')
     .sort((a, b) => (a.dueDate || '').localeCompare(b.dueDate || ''))[0];
   const studentLastPaid = appState.payments
-    .filter(p => p.studentId === currentStudent.id && p.status === 'paid')
+    .filter(p => p.studentId === currentStudent?.id && p.status === 'paid')
     .sort((a, b) => (b.paidDate || '').localeCompare(a.paidDate || ''))[0];
 
-  const recentSessions = (appState.workoutLogs || []).slice(0, 3);
+  const sessionsDesc = [...(scoped.workoutLogs || [])].sort((a, b) => b.date.localeCompare(a.date));
+  const recentSessions = sessionsDesc.slice(0, 3);
+
+  // Datos reales del alumno activo (antes había valores escritos a mano).
+  const latestMeso = scoped.mesocycles[scoped.mesocycles.length - 1] || null;
+  const dow = (new Date().getDay() + 6) % 7; // 0 = lunes
+  const isWeekend = dow > 4;
+  const todayDay = latestMeso?.days?.length ? latestMeso.days[isWeekend ? 0 : dow % latestMeso.days.length] : null;
+  const spotlightBlock = todayDay?.blocks?.[0] || null;
+  const strengthLogs = scoped.strengthProgression || [];
+  const firstKg = strengthLogs[0]?.totalKilos || 0;
+  const lastKg = strengthLogs[strengthLogs.length - 1]?.totalKilos || 0;
+  const kgPct = firstKg > 0 ? Math.round(((lastKg - firstKg) / firstKg) * 100) : 0;
+  const lastRpes = sessionsDesc.slice(0, 10).map(l => Number(l.rpe)).filter(Boolean);
+  const avgRpe = lastRpes.length ? (lastRpes.reduce((a, b) => a + b, 0) / lastRpes.length).toFixed(1) : '—';
+  const weekAgo = addDaysISO(todayISO(), -6);
+  const weeklyHours = (sessionsDesc.filter(l => l.date >= weekAgo).reduce((a, l) => a + (l.durationSeconds || 0), 0) / 3600).toFixed(1);
+  const coachShortName = (appState.coach.name || 'PROFE').split(' ').slice(-1)[0].toUpperCase();
+  const usedPlans = [...new Set(appState.students.map(s => appState.plans.find(pl => pl.id === s.planId)?.sessionsPerWeek).filter(Boolean))].sort();
+
+  if (!currentStudent) {
+    return (
+      <div className="space-y-6 animate-fadeIn pb-24">
+        <div className="rounded-3xl border border-volt-neon/30 bg-dark-900 p-6 sm:p-10 space-y-3">
+          <h1 className="text-2xl sm:text-4xl font-black text-white uppercase">Hola{appState.coach.name ? `, ${appState.coach.name.split(' ')[0]}` : ''}</h1>
+          <p className="text-sm text-slate-300 max-w-xl">
+            {currentRole === 'coach'
+              ? 'Todavía no cargaste alumnos. Empezá por crear el primero: se le genera su cuota y podés invitarlo a la app.'
+              : 'Tu profe todavía no terminó de configurar tu cuenta.'}
+          </p>
+          {currentRole === 'coach' && (
+            <button onClick={() => setCurrentTab('students')} className="btn-volt px-5 py-3 rounded-2xl text-xs font-black uppercase">Crear mi primer alumno</button>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 sm:space-y-8 animate-fadeIn pb-24 safe-area-bottom">
@@ -76,14 +115,14 @@ export default function DashboardView({ appState, setCurrentTab, setSelectedVide
           <div>
             <h1 className="text-2xl sm:text-4xl lg:text-5xl font-black text-white tracking-tight uppercase leading-none font-display">
               {currentRole === 'coach' ? (
-                <>CENTRO DE COMANDO <span className="text-gradient-volt">PF LARROCA</span></>
+                <>CENTRO DE COMANDO <span className="text-gradient-volt">PF {coachShortName}</span></>
               ) : (
                 <>HOLA, <span className="text-gradient-volt">{currentStudent.name.toUpperCase()}</span></>
               )}
             </h1>
             <p className="text-xs sm:text-sm text-slate-300 mt-2.5 max-w-xl leading-relaxed">
               {currentRole === 'coach'
-                ? `Tienes ${totalStudents} atletas activos bajo seguimiento. Control de sobrecarga, videoteca técnica y gestión de caja sincronizados.`
+                ? `Tenés ${totalStudents} ${totalStudents === 1 ? 'alumno activo' : 'alumnos activos'}. Abajo ves los datos de ${currentStudent.name}; cambiá de alumno con el selector de arriba.`
                 : `Planificación activa de hipertrofia y fuerza. Peso actual: ${currentStudent.currentWeight} kg hacia la meta de ${currentStudent.targetWeight} kg.`}
             </p>
           </div>
@@ -121,19 +160,21 @@ export default function DashboardView({ appState, setCurrentTab, setSelectedVide
         <div className="relative z-10 border-t border-slate-800/80 bg-dark-950/80 backdrop-blur-md px-6 sm:px-10 py-3 grid grid-cols-3 sm:grid-cols-4 gap-4 text-xs">
           <div>
             <span className="text-[10px] text-slate-400 font-bold uppercase block">Mesociclo</span>
-            <strong className="text-white font-black text-sm">N° 1 (Febrero)</strong>
+            <strong className="text-white font-black text-sm">{latestMeso ? latestMeso.name : 'Sin rutina'}</strong>
           </div>
           <div>
             <span className="text-[10px] text-slate-400 font-bold uppercase block">Kilos Movidos</span>
-            <strong className="text-volt-neon font-black text-sm">324 kg (+48%)</strong>
+            <strong className="text-volt-neon font-black text-sm">{lastKg ? `${lastKg} kg (${kgPct >= 0 ? '+' : ''}${kgPct}%)` : 'Sin registros'}</strong>
           </div>
           <div>
             <span className="text-[10px] text-slate-400 font-bold uppercase block">Adherencia</span>
-            <strong className="text-white font-black text-sm">95% Cumplido</strong>
+            <strong className="text-white font-black text-sm">{progress.attendancePct}% asistencia</strong>
           </div>
           <div className="hidden sm:block">
             <span className="text-[10px] text-slate-400 font-bold uppercase block">Estado de Cuota</span>
-            <strong className="text-emerald-400 font-black text-sm">Al Día</strong>
+            <strong className={`font-black text-sm ${!studentUnpaid ? 'text-emerald-400' : studentUnpaid.status === 'overdue' ? 'text-rose-400' : 'text-amber-400'}`}>
+              {!studentUnpaid ? 'Al Día' : studentUnpaid.status === 'overdue' ? 'Vencida' : `Pendiente (${studentUnpaid.monthPeriod.split(' ')[0]})`}
+            </strong>
           </div>
         </div>
       </div>
@@ -154,11 +195,13 @@ export default function DashboardView({ appState, setCurrentTab, setSelectedVide
           </div>
           <div>
             <div className="text-2xl sm:text-3xl font-black text-white tracking-tight">
-              {currentRole === 'coach' ? `${totalStudents} Alumnos` : `${currentStudent.weeklyHours} hs/sem`}
+              {currentRole === 'coach' ? `${totalStudents} Alumnos` : `${weeklyHours} hs/sem`}
             </div>
             <p className="text-[11px] text-slate-400 mt-1 flex items-center gap-1">
               <span className="w-1.5 h-1.5 rounded-full bg-volt-neon inline-block" />
-              {currentRole === 'coach' ? 'Planes de 3x y 5x activos' : 'Cumplimiento semanal 95%'}
+              {currentRole === 'coach'
+                ? (usedPlans.length ? `Planes de ${usedPlans.join('x, ')}x por semana` : 'Sin planes asignados')
+                : `Asistencia últimas 4 semanas: ${progress.attendancePct}%`}
             </p>
           </div>
         </div>
@@ -203,10 +246,10 @@ export default function DashboardView({ appState, setCurrentTab, setSelectedVide
           </div>
           <div>
             <div className="text-2xl sm:text-3xl font-black text-rose-400 tracking-tight">
-              {currentStudent.avgFatigue} / 10
+              {avgRpe} / 10
             </div>
             <p className="text-[11px] text-slate-400 mt-1">
-              Esfuerzo medio supervisado
+              {lastRpes.length ? `Promedio de las últimas ${lastRpes.length} sesiones` : 'Sin sesiones registradas'}
             </p>
           </div>
         </div>
@@ -223,10 +266,10 @@ export default function DashboardView({ appState, setCurrentTab, setSelectedVide
           </div>
           <div>
             <div className="text-2xl sm:text-3xl font-black text-amber-300 tracking-tight">
-              324 kg
+              {lastKg ? `${lastKg} kg` : '—'}
             </div>
             <p className="text-[11px] text-slate-400 mt-1 flex items-center gap-1 font-semibold text-emerald-400">
-              <span>+48% vs Mesociclo 1</span>
+              <span>{strengthLogs.length > 1 ? `${kgPct >= 0 ? '+' : ''}${kgPct}% vs ${strengthLogs[0].mes}` : 'Cargá registros en Fuerza'}</span>
             </p>
           </div>
         </div>
@@ -241,12 +284,14 @@ export default function DashboardView({ appState, setCurrentTab, setSelectedVide
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-lg font-black text-white uppercase tracking-tight flex items-center gap-2">
-                <span>Rutina de Hoy • Lunes</span>
-                <span className="text-xs px-2 py-0.5 rounded-md bg-volt-neon/15 text-volt-neon font-black">
-                  MESOCICLO 1
-                </span>
+                <span>{isWeekend ? 'Próxima sesión' : 'Rutina de hoy'}{todayDay ? ` • ${todayDay.name}` : ''}</span>
+                {latestMeso && (
+                  <span className="text-xs px-2 py-0.5 rounded-md bg-volt-neon/15 text-volt-neon font-black uppercase">
+                    {latestMeso.name.split('(')[0].split('—')[0].trim()}
+                  </span>
+                )}
               </h2>
-              <p className="text-xs text-slate-400">Enfoque: Movilidad, Cadena Posterior y Cuádriceps</p>
+              <p className="text-xs text-slate-400">{todayDay ? `Enfoque: ${todayDay.focus}` : 'Todavía no hay una rutina asignada.'}</p>
             </div>
             <button
               onClick={() => setCurrentTab('routines')}
@@ -260,15 +305,20 @@ export default function DashboardView({ appState, setCurrentTab, setSelectedVide
           <div className="bg-dark-900/85 border border-slate-800 rounded-3xl p-5 space-y-3 shadow-xl">
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
               <span className="text-xs font-black text-slate-300 uppercase tracking-wider">
-                Bloque 1: Activación y Fuerza (X 3 SERIES)
+                {spotlightBlock ? `${spotlightBlock.title} (X ${spotlightBlock.rounds} series)` : 'Sin ejercicios cargados'}
               </span>
               <span className="text-[10px] font-black px-2.5 py-0.5 rounded-full bg-volt-neon/15 text-volt-neon border border-volt-neon/30">
-                4 Ejercicios
+                {spotlightBlock?.exercises?.length || 0} Ejercicios
               </span>
             </div>
 
             <div className="space-y-2">
-              {appState.mesocycles[0].days[0].blocks[0].exercises.map((ex, idx) => {
+              {!spotlightBlock && (
+                <p className="text-xs text-slate-400 p-3">
+                  {currentRole === 'coach' ? 'Asignale una plantilla o armá su rutina en "Rutinas & Mesociclos".' : 'Tu profe todavía no te asignó una rutina.'}
+                </p>
+              )}
+              {(spotlightBlock?.exercises || []).map((ex, idx) => {
                 const video = appState.videoLibrary.find(v => v.id === ex.videoId);
                 return (
                   <div
@@ -330,11 +380,7 @@ export default function DashboardView({ appState, setCurrentTab, setSelectedVide
           <div className="bg-dark-900/85 border border-slate-800 rounded-3xl p-5 space-y-4 shadow-xl">
             <div className="flex items-center gap-3.5 pb-3 border-b border-slate-800">
               <div className="relative">
-                <img
-                  src={currentStudent.avatar}
-                  alt={currentStudent.name}
-                  className="w-14 h-14 rounded-2xl object-cover ring-2 ring-volt-neon/40 shadow-lg"
-                />
+                <Avatar student={currentStudent} className="w-14 h-14 rounded-2xl ring-2 ring-volt-neon/40 shadow-lg" />
                 <span className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-emerald-500 border-2 border-dark-900" />
               </div>
               <div>

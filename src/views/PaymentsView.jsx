@@ -19,13 +19,34 @@ import {
   ExternalLink,
   MessageCircle,
   ShieldCheck,
-  QrCode,
   Zap
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
+import Avatar from '../components/Avatar';
+import { useEscape } from '../hooks/useEscape';
 import { latestPeriod, periodsList, monthLabel, todayISO, formatDate, copyToClipboard } from '../utils/helpers';
 
-export default function PaymentsView({ appState, onUpdatePayment, onAddPayment, onUpdateCoachInfo, currentRole }) {
+export default function PaymentsView({ appState, onUpdatePayment, onAddPayment, onUpdateCoachInfo, currentRole, mode, mercadoPagoLink, notify }) {
+  const [mpBusy, setMpBusy] = useState(false);
+  const [mpError, setMpError] = useState(null);
+  const realMP = mode === 'cloud' && appState.coach.mpEnabled;
+  const canPayMP = realMP || Boolean(appState.coach.mpCheckoutLink) || mode !== 'cloud';
+  const [coachMpLink, setCoachMpLink] = useState(appState.coach.mpCheckoutLink || '');
+  const [coachBillingDay, setCoachBillingDay] = useState(appState.coach.billingDay || 10);
+  const [coachMpEnabled, setCoachMpEnabled] = useState(Boolean(appState.coach.mpEnabled));
+
+  const handlePayWithMP = async (payment) => {
+    setMpBusy(true);
+    setMpError(null);
+    try {
+      const { initPoint } = await mercadoPagoLink(payment.id);
+      window.location.assign(initPoint);
+    } catch (e) {
+      setMpError(e.message || 'No se pudo generar el link de pago. Probá con transferencia.');
+    } finally {
+      setMpBusy(false);
+    }
+  };
   const [activeFilter, setActiveFilter] = useState('all'); // 'all' | 'paid' | 'pending' | 'overdue'
   const [searchTerm, setSearchTerm] = useState('');
   const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false);
@@ -63,6 +84,9 @@ export default function PaymentsView({ appState, onUpdatePayment, onAddPayment, 
     setCoachAlias(appState.coach.alias);
     setCoachCbu(appState.coach.cbu);
     setCoachBank(appState.coach.bank);
+    setCoachMpLink(appState.coach.mpCheckoutLink || '');
+    setCoachBillingDay(appState.coach.billingDay || 10);
+    setCoachMpEnabled(Boolean(appState.coach.mpEnabled));
     setIsSettingsOpen(true);
   };
 
@@ -70,6 +94,12 @@ export default function PaymentsView({ appState, onUpdatePayment, onAddPayment, 
   const [coachAlias, setCoachAlias] = useState(appState.coach.alias);
   const [coachCbu, setCoachCbu] = useState(appState.coach.cbu);
   const [coachBank, setCoachBank] = useState(appState.coach.bank);
+
+  const anyModalOpen = Boolean(selectedPaymentForAction || isRegisterModalOpen || isSettingsOpen || isMercadoPagoModalOpen || receiptPayment);
+  useEscape(anyModalOpen, () => {
+    setSelectedPaymentForAction(null); setIsRegisterModalOpen(false); setIsSettingsOpen(false);
+    setIsMercadoPagoModalOpen(false); setReceiptPayment(null);
+  });
 
   // Financial statistics: por defecto el período más reciente con cuotas cargadas
   const availablePeriods = periodsList(appState.payments);
@@ -191,13 +221,16 @@ export default function PaymentsView({ appState, onUpdatePayment, onAddPayment, 
     onUpdateCoachInfo({
       alias: coachAlias.trim().toUpperCase(),
       cbu: coachCbu.replace(/\s/g, ''),
-      bank: coachBank.trim()
+      bank: coachBank.trim(),
+      mpCheckoutLink: coachMpLink.trim(),
+      billingDay: Math.min(28, Math.max(1, Number(coachBillingDay) || 10)),
+      mpEnabled: mode === 'cloud' ? coachMpEnabled : false
     });
     setIsSettingsOpen(false);
   };
 
   // Student perspective
-  const currentStudent = appState.students[0]; // Alumna del portal (Agostina Baju)
+  const currentStudent = appState.activeStudent || { id: null, name: '—', planId: null };
   const studentPlan = appState.plans.find(pl => pl.id === currentStudent.planId);
   const studentPayments = appState.payments
     .filter(p => p.studentId === currentStudent.id)
@@ -287,16 +320,17 @@ export default function PaymentsView({ appState, onUpdatePayment, onAddPayment, 
 
             {/* Pay with Mercado Pago button & Notify WhatsApp */}
             <div className="pt-2 space-y-2">
-              {studentDuePayment && (
+              {studentDuePayment && canPayMP && (
               <button
                 onClick={() => {
                   setSelectedMPPayment(studentDuePayment);
+                  setMpError(null);
                   setIsMercadoPagoModalOpen(true);
                 }}
                 className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl bg-sky-500 hover:bg-sky-400 text-slate-950 font-black text-xs shadow-lg shadow-sky-500/25 active:scale-95 transition-all"
               >
                 <Zap className="w-4 h-4 fill-slate-950" />
-                <span>Pagar con Mercado Pago (Link / QR Inmediato)</span>
+                <span>Pagar con Mercado Pago</span>
               </button>
               )}
 
@@ -470,11 +504,7 @@ export default function PaymentsView({ appState, onUpdatePayment, onAddPayment, 
                   className="p-4 rounded-2xl bg-slate-900/90 border border-slate-800/90 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-md"
                 >
                   <div className="flex items-center gap-3">
-                    <img
-                      src={student?.avatar || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100"}
-                      alt={p.studentName}
-                      className="w-10 h-10 rounded-xl object-cover ring-1 ring-slate-700 shrink-0"
-                    />
+                    <Avatar student={student || { name: p.studentName }} className="w-10 h-10 rounded-xl ring-1 ring-slate-700" />
                     <div>
                       <div className="flex items-center gap-2">
                         <span className="text-sm font-bold text-white">{p.studentName}</span>
@@ -734,6 +764,23 @@ export default function PaymentsView({ appState, onUpdatePayment, onAddPayment, 
                 <input type="text" value={coachBank} onChange={(e) => setCoachBank(e.target.value)} required
                   className="w-full p-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white focus:outline-none focus:border-emerald-500" />
               </div>
+              <div className="grid grid-cols-2 gap-3">
+                <label className="block text-slate-300 font-semibold">Día de vencimiento de la cuota:
+                  <input type="number" min="1" max="28" value={coachBillingDay} onChange={(e) => setCoachBillingDay(e.target.value)}
+                    className="mt-1 w-full p-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white font-mono focus:outline-none focus:border-emerald-500" />
+                </label>
+                <label className="block text-slate-300 font-semibold">Link de pago fijo de MP (opcional):
+                  <input type="url" value={coachMpLink} onChange={(e) => setCoachMpLink(e.target.value)} placeholder="https://mpago.la/..."
+                    className="mt-1 w-full p-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white focus:outline-none focus:border-emerald-500" />
+                </label>
+              </div>
+              {mode === 'cloud' && (
+                <label className="flex items-start gap-2 text-slate-300">
+                  <input type="checkbox" checked={coachMpEnabled} onChange={(e) => setCoachMpEnabled(e.target.checked)} className="mt-0.5 accent-emerald-500" />
+                  <span>Cobro automático con Mercado Pago: cada cuota genera su link y se marca pagada sola al acreditarse.
+                    <span className="block text-[10px] text-slate-500">Requiere tener configurada la integración de Mercado Pago en el servidor.</span></span>
+                </label>
+              )}
             </div>
             <div className="flex items-center justify-end gap-2 pt-2">
               <button type="button" onClick={() => setIsSettingsOpen(false)} className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold">Cancelar</button>
@@ -797,44 +844,48 @@ export default function PaymentsView({ appState, onUpdatePayment, onAddPayment, 
               </span>
             </div>
 
-            {/* Simulated QR Code */}
-            <div className="flex flex-col items-center justify-center p-4 rounded-2xl bg-white text-slate-950 space-y-2">
-              <div className="w-40 h-40 border-4 border-slate-950 rounded-xl p-2 flex items-center justify-center relative bg-white">
-                <QrCode className="w-full h-full text-slate-950" />
-              </div>
-              <span className="text-[11px] font-bold text-slate-800">
-                Escanea con la App de Mercado Pago o tu Banco
-              </span>
-            </div>
+            {mpError && <p role="alert" className="text-xs text-rose-400 font-semibold">{mpError}</p>}
 
-            {/* Direct Link */}
-            <div className="p-2.5 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between text-xs">
-              <span className="text-slate-400 truncate max-w-[200px]">{appState.coach.mpCheckoutLink}</span>
-              <a
-                href={appState.coach.mpCheckoutLink}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-sky-400 font-bold hover:underline flex items-center gap-1 shrink-0"
-              >
-                <span>Abrir Link</span>
-                <ExternalLink className="w-3.5 h-3.5" />
-              </a>
-            </div>
-
-            {/* Test Simulation Button */}
-            <div className="pt-2">
+            {realMP ? (
               <button
                 type="button"
-                onClick={() => selectedMPPayment?.id && handleSimulateMPApproval(selectedMPPayment)}
-                className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl bg-gradient-to-r from-sky-500 to-emerald-500 hover:opacity-90 text-slate-950 font-black text-xs shadow-xl active:scale-95 transition-all"
+                disabled={mpBusy || !selectedMPPayment?.id}
+                onClick={() => handlePayWithMP(selectedMPPayment)}
+                className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl bg-sky-500 hover:bg-sky-400 text-slate-950 font-black text-sm disabled:opacity-60"
               >
-                <Sparkles className="w-4 h-4" />
-                <span>Simular Pago Aprobado (Webhook Inmediato)</span>
+                <Zap className="w-4 h-4 fill-slate-950" aria-hidden="true" />
+                <span>{mpBusy ? 'Generando link seguro…' : 'Ir a pagar con Mercado Pago'}</span>
               </button>
-              <span className="text-[10px] text-slate-500 text-center block mt-1.5">
-                Al simularlo, el estado cambiará automáticamente a "Al día" en el sistema.
-              </span>
-            </div>
+            ) : appState.coach.mpCheckoutLink ? (
+              <>
+                <a
+                  href={appState.coach.mpCheckoutLink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl bg-sky-500 hover:bg-sky-400 text-slate-950 font-black text-sm"
+                >
+                  <span>Abrir link de pago del profe</span>
+                  <ExternalLink className="w-4 h-4" aria-hidden="true" />
+                </a>
+                <p className="text-[11px] text-slate-400 text-center">Ingresá el monto de la cuota y después mandale el comprobante al profe por WhatsApp.</p>
+              </>
+            ) : (
+              <p className="text-xs text-slate-400 text-center">El profe todavía no cargó un link de Mercado Pago. Podés pagar por transferencia.</p>
+            )}
+
+            {/* Solo en la demo: simula la confirmación que en producción llega por el webhook */}
+            {mode !== 'cloud' && (
+              <div className="pt-2 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => selectedMPPayment?.id && handleSimulateMPApproval(selectedMPPayment)}
+                  className="w-full flex items-center justify-center gap-2 py-2.5 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs"
+                >
+                  <Sparkles className="w-4 h-4" aria-hidden="true" />
+                  <span>Simular pago aprobado (solo demo)</span>
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}

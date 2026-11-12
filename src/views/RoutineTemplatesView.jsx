@@ -8,13 +8,21 @@ import {
   Sparkles,
   Dumbbell,
   ArrowRight,
-  BookOpen
+  BookOpen,
+  Edit2,
+  Trash2
 } from 'lucide-react';
+import RoutineEditor from '../components/RoutineEditor';
+import { countExercises } from '../domain/model';
+import { useEscape } from '../hooks/useEscape';
 
-export default function RoutineTemplatesView({ appState, onApplyTemplate }) {
+export default function RoutineTemplatesView({ appState, onApplyTemplate, onSaveTemplate, onDeleteTemplate }) {
   const [selectedTemplate, setSelectedTemplate] = useState(null);
   const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
-  const [selectedStudentId, setSelectedStudentId] = useState(appState.students[0].id);
+  const [editor, setEditor] = useState(null);
+  const [selectedStudentId, setSelectedStudentId] = useState(appState.activeStudent?.id || appState.students[0]?.id || '');
+  useEscape(isAssignModalOpen, () => setIsAssignModalOpen(false));
+  const activeStudents = appState.students.filter(s => s.status !== 'inactive');
   const [mesoTargetName, setMesoTargetName] = useState('');
   const [assignedMessage, setAssignedMessage] = useState(null);
 
@@ -22,8 +30,10 @@ export default function RoutineTemplatesView({ appState, onApplyTemplate }) {
 
   const handleOpenAssign = (tmpl) => {
     setSelectedTemplate(tmpl);
+    setSelectedStudentId(appState.activeStudent?.id || activeStudents[0]?.id || '');
     // Siguiente número de mesociclo según los existentes (ej: si hay un "Mesociclo 7", propone el 8)
-    const maxNum = appState.mesocycles.reduce((max, m) => {
+    const target = appState.activeStudent?.id || activeStudents[0]?.id;
+    const maxNum = appState.mesocycles.filter(m => m.studentId === target).reduce((max, m) => {
       const n = Number((m.name.match(/Mesociclo\s+(\d+)/i) || [])[1]);
       return n > max ? n : max;
     }, 0);
@@ -31,16 +41,17 @@ export default function RoutineTemplatesView({ appState, onApplyTemplate }) {
     setIsAssignModalOpen(true);
   };
 
-  const handleConfirmAssign = (e) => {
+  const handleConfirmAssign = async (e) => {
     e.preventDefault();
-    if (!selectedTemplate) return;
+    if (!selectedTemplate || !selectedStudentId) return;
 
-    onApplyTemplate({
+    const ok = await onApplyTemplate({
       templateId: selectedTemplate.id,
       studentId: selectedStudentId,
       mesoName: mesoTargetName
     });
 
+    if (ok === false) return;
     setAssignedMessage(`Plantilla "${selectedTemplate.name}" asignada a ${appState.students.find(s => s.id === selectedStudentId)?.name} como "${mesoTargetName}". Ya la ves en Rutinas & Mesociclos.`);
     setTimeout(() => setAssignedMessage(null), 5000);
     setIsAssignModalOpen(false);
@@ -60,9 +71,12 @@ export default function RoutineTemplatesView({ appState, onApplyTemplate }) {
             </span>
           </div>
           <p className="text-xs text-slate-400 mt-1">
-            Reutiliza y clona planificaciones completas estructuradas para asignarlas a cualquier alumno en segundos.
+            Reutilizá planificaciones completas y asignalas a cualquier alumno en segundos. Cada plantilla tiene sus propios días y ejercicios.
           </p>
         </div>
+        <button onClick={() => setEditor({ initial: null })} className="btn-volt flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-black self-start">
+          <Plus className="w-4 h-4" aria-hidden="true" />Nueva plantilla
+        </button>
       </div>
 
       {assignedMessage && (
@@ -95,7 +109,7 @@ export default function RoutineTemplatesView({ appState, onApplyTemplate }) {
               <div className="grid grid-cols-3 gap-2 pt-2 border-t border-slate-800/80 text-center text-xs">
                 <div className="p-2 rounded-xl bg-slate-950/80 border border-slate-800">
                   <span className="text-[10px] text-slate-500 block">Días/Sem</span>
-                  <strong className="text-white font-black">{tmpl.daysCount} días</strong>
+                  <strong className="text-white font-black">{tmpl.days?.length || tmpl.daysCount} días</strong>
                 </div>
                 <div className="p-2 rounded-xl bg-slate-950/80 border border-slate-800">
                   <span className="text-[10px] text-slate-500 block">Duración</span>
@@ -103,15 +117,20 @@ export default function RoutineTemplatesView({ appState, onApplyTemplate }) {
                 </div>
                 <div className="p-2 rounded-xl bg-slate-950/80 border border-slate-800">
                   <span className="text-[10px] text-slate-500 block">Ejercicios</span>
-                  <strong className="text-emerald-400 font-black">{tmpl.totalExercises} tot.</strong>
+                  <strong className="text-emerald-400 font-black">{countExercises(tmpl.days)} tot.</strong>
                 </div>
               </div>
             </div>
 
-            <div className="pt-2">
+            <div className="pt-2 flex gap-2">
+              <button onClick={() => setEditor({ initial: tmpl })} aria-label={`Editar plantilla ${tmpl.name}`}
+                className="p-2.5 rounded-xl border border-slate-700 text-slate-300 hover:text-white"><Edit2 className="w-3.5 h-3.5" /></button>
+              <button onClick={() => window.confirm(`¿Eliminar la plantilla "${tmpl.name}"?`) && onDeleteTemplate(tmpl.id)} aria-label={`Eliminar plantilla ${tmpl.name}`}
+                className="p-2.5 rounded-xl border border-slate-800 text-slate-400 hover:text-rose-400"><Trash2 className="w-3.5 h-3.5" /></button>
               <button
+                disabled={!tmpl.days?.length || !activeStudents.length}
                 onClick={() => handleOpenAssign(tmpl)}
-                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs shadow-lg shadow-emerald-500/20 active:scale-95 transition-all"
+                className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs shadow-lg shadow-emerald-500/20 active:scale-95 transition-all disabled:opacity-40"
               >
                 <Copy className="w-3.5 h-3.5" />
                 <span>Asignar a un Alumno</span>
@@ -149,7 +168,7 @@ export default function RoutineTemplatesView({ appState, onApplyTemplate }) {
                   onChange={(e) => setSelectedStudentId(e.target.value)}
                   className="w-full p-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white focus:outline-none focus:border-emerald-500"
                 >
-                  {appState.students.map(s => (
+                  {activeStudents.map(s => (
                     <option key={s.id} value={s.id}>{s.name}{s.email ? ` (${s.email})` : ''}</option>
                   ))}
                 </select>
@@ -184,6 +203,11 @@ export default function RoutineTemplatesView({ appState, onApplyTemplate }) {
             </div>
           </form>
         </div>
+      )}
+      {editor && (
+        <RoutineEditor kind="template" initial={editor.initial} videoLibrary={appState.videoLibrary}
+          onSave={async (t) => { const ok = await onSaveTemplate(t); if (ok !== false) setEditor(null); }}
+          onClose={() => setEditor(null)} />
       )}
     </div>
   );

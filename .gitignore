@@ -28,3 +28,12 @@ dist-ssr
 .env
 .env.local
 .env.*.local
+
+# Firebase
+.firebaserc
+.firebase/
+functions/node_modules
+functions/.secret.local
+firebase-debug.log
+firestore-debug.log
+ui-debug.log

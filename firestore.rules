@@ -1,0 +1,125 @@
+rules_version = '2';
+
+// Reglas de seguridad de NexCoach.
+// - Cada profe es dueño de su espacio: coaches/{uid}/...
+// - Cada alumno solo puede leer SUS datos (cuotas, rutinas, medidas, etc.) y escribir
+//   únicamente sus sesiones, sus hábitos y sus videos de técnica.
+// - Las cuotas solo las modifica el profe o el servidor (webhook de Mercado Pago).
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() { return request.auth != null; }
+    function userPath() { return /databases/$(database)/documents/users/$(request.auth.uid); }
+    function hasProfile() { return signedIn() && exists(userPath()); }
+    function profile() { return get(userPath()).data; }
+    function isCoach(coachId) { return signedIn() && request.auth.uid == coachId; }
+    function isStudentOf(coachId) { return hasProfile() && profile().role == 'student' && profile().coachId == coachId; }
+    function myStudentId() { return profile().studentId; }
+    function readsOwn(coachId) { return isStudentOf(coachId) && resource.data.studentId == myStudentId(); }
+    function writesOwn(coachId) { return isStudentOf(coachId) && request.resource.data.studentId == myStudentId(); }
+    function invitePath(code) { return /databases/$(database)/documents/invites/$(code); }
+
+    // Perfil de cada usuario: rol, profe y alumno vinculado. Se crea una sola vez.
+    match /users/{uid} {
+      allow read: if signedIn() && request.auth.uid == uid;
+      allow create: if signedIn() && request.auth.uid == uid && (
+        (request.resource.data.role == 'coach' && request.resource.data.coachId == uid)
+        || (request.resource.data.role == 'student'
+            && request.resource.data.inviteCode is string
+            && getAfter(invitePath(request.resource.data.inviteCode)).data.usedBy == uid
+            && get(invitePath(request.resource.data.inviteCode)).data.coachId == request.resource.data.coachId
+            && get(invitePath(request.resource.data.inviteCode)).data.studentId == request.resource.data.studentId)
+      );
+      allow update, delete: if false;
+    }
+
+    // Códigos de invitación para que el alumno cree su cuenta.
+    match /invites/{code} {
+      allow get: if signedIn();
+      allow list: if false;
+      allow create: if signedIn()
+        && request.resource.data.coachId == request.auth.uid
+        && request.resource.data.usedBy == null;
+      allow update: if signedIn() && (
+        resource.data.coachId == request.auth.uid
+        || (resource.data.usedBy == null
+            && request.resource.data.usedBy == request.auth.uid
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['usedBy', 'usedAt']))
+      );
+      allow delete: if signedIn() && resource.data.coachId == request.auth.uid;
+    }
+
+    match /coaches/{coachId} {
+      // Datos del profe (nombre, alias, CBU): los alumnos los necesitan para pagar.
+      allow read: if isCoach(coachId) || isStudentOf(coachId);
+      allow create, update: if isCoach(coachId);
+      allow delete: if false;
+
+      match /students/{sid} {
+        allow read: if isCoach(coachId) || (isStudentOf(coachId) && sid == myStudentId());
+        allow write: if isCoach(coachId);
+      }
+
+      // Compartido con todos sus alumnos
+      match /plans/{id} {
+        allow read: if isCoach(coachId) || isStudentOf(coachId);
+        allow write: if isCoach(coachId);
+      }
+      match /videoLibrary/{id} {
+        allow read: if isCoach(coachId) || isStudentOf(coachId);
+        allow write: if isCoach(coachId);
+      }
+
+      // Solo el profe
+      match /routineTemplates/{id} {
+        allow read, write: if isCoach(coachId);
+      }
+
+      // Del alumno, solo lectura para él
+      match /payments/{id} {
+        allow read: if isCoach(coachId) || readsOwn(coachId);
+        allow write: if isCoach(coachId);
+      }
+      match /mesocycles/{id} {
+        allow read: if isCoach(coachId) || readsOwn(coachId);
+        allow write: if isCoach(coachId);
+      }
+      match /anthropometry/{id} {
+        allow read: if isCoach(coachId) || readsOwn(coachId);
+        allow write: if isCoach(coachId);
+      }
+      match /strengthProgression/{id} {
+        allow read: if isCoach(coachId) || readsOwn(coachId);
+        allow write: if isCoach(coachId);
+      }
+      match /weightHistory/{id} {
+        allow read: if isCoach(coachId) || readsOwn(coachId);
+        allow write: if isCoach(coachId);
+      }
+
+      // El alumno registra sus sesiones (no las puede borrar ni editar después)
+      match /workoutLogs/{id} {
+        allow read: if isCoach(coachId) || readsOwn(coachId);
+        allow create: if isCoach(coachId) || writesOwn(coachId);
+        allow update, delete: if isCoach(coachId);
+      }
+
+      // El alumno envía videos; la calificación y la devolución las pone el profe
+      match /techniqueSubmissions/{id} {
+        allow read: if isCoach(coachId) || readsOwn(coachId);
+        allow create: if isCoach(coachId) || (writesOwn(coachId)
+          && request.resource.data.status == 'pending'
+          && request.resource.data.rating == null
+          && request.resource.data.coachFeedback == null);
+        allow update, delete: if isCoach(coachId);
+      }
+
+      // Hábitos: un documento por alumno (id = studentId)
+      match /habits/{sid} {
+        allow read: if isCoach(coachId) || readsOwn(coachId);
+        allow write: if isCoach(coachId)
+          || (isStudentOf(coachId) && sid == myStudentId() && request.resource.data.studentId == sid);
+      }
+    }
+  }
+}

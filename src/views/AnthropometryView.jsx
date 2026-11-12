@@ -13,7 +13,7 @@ import {
   ArrowRight
 } from 'lucide-react';
 
-export default function AnthropometryView({ appState, onAddMeasurement }) {
+export default function AnthropometryView({ appState, onAddMeasurement, currentRole }) {
   const [selectedMetric, setSelectedMetric] = useState('gluteos');
   const [chartType, setChartType] = useState('area'); // 'area' | 'bar'
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -29,7 +29,8 @@ export default function AnthropometryView({ appState, onAddMeasurement }) {
     biceps: { label: 'Bíceps', color: '#14b8a6', gradient: 'from-teal-400 to-emerald-400', unit: 'cm' }
   };
 
-  const anthropometry = appState.anthropometry;
+  const anthropometry = appState.scoped.anthropometry;
+  const DATA_EMPTY = anthropometry.length === 0;
   const firstMeso = anthropometry[0];
   const lastMeso = anthropometry[anthropometry.length - 1];
 
@@ -125,6 +126,7 @@ export default function AnthropometryView({ appState, onAddMeasurement }) {
             </p>
           </div>
 
+          {currentRole === 'coach' && (
           <button
             onClick={() => { setNewMesoName(`Mesociclo ${anthropometry.length + 1}`); setIsModalOpen(true); }}
             className="btn-volt flex items-center justify-center gap-2 px-5 py-3 rounded-2xl text-xs font-black shadow-lg shadow-volt/20 hover:scale-[1.02] transition-all self-start md:self-auto"
@@ -132,9 +134,16 @@ export default function AnthropometryView({ appState, onAddMeasurement }) {
             <Plus className="w-4 h-4 stroke-[3]" />
             <span>NUEVO MESOCICLO</span>
           </button>
+          )}
         </div>
       </div>
 
+      {DATA_EMPTY ? (
+        <div className="p-6 rounded-3xl bg-obsidian-card/90 border border-dashed border-slate-700 text-center space-y-2">
+          <p className="text-sm font-bold text-white">Todavía no hay medidas registradas para {appState.activeStudent?.name || 'este alumno'}.</p>
+          <p className="text-xs text-slate-400">{currentRole === 'coach' ? 'Cargá el primer registro con el botón de arriba.' : 'Tu profe va a cargar tus registros.'}</p>
+        </div>
+      ) : (<>
       {/* KPI Delta Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
         {[
@@ -461,6 +470,8 @@ export default function AnthropometryView({ appState, onAddMeasurement }) {
           </table>
         </div>
       </div>
+
+      </>)}
 
       {/* Modal: Registrar Nuevo Mesociclo */}
       {isModalOpen && (

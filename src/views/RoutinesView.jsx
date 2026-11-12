@@ -12,15 +12,55 @@ import {
   Clock,
   Zap,
   Activity,
-  Video
+  Video,
+  Edit2,
+  Copy,
+  Trash2,
+  BookmarkPlus
 } from 'lucide-react';
+import RoutineEditor from '../components/RoutineEditor';
+import { cloneDays, newId } from '../domain/model';
 
-export default function RoutinesView({ appState, setSelectedVideo, onStartWorkout }) {
-  const [selectedMesoId, setSelectedMesoId] = useState(appState.mesocycles[0].id);
+export default function RoutinesView({ appState, currentRole, setSelectedVideo, onStartWorkout, onSaveMesocycle, onDeleteMesocycle, onSaveTemplate, onGoToTemplates }) {
+  const mesocycles = appState.scoped.mesocycles;
+  const isCoach = currentRole === 'coach';
+  const [selectedMesoId, setSelectedMesoId] = useState(mesocycles[mesocycles.length - 1]?.id || null);
   const [selectedDayIndex, setSelectedDayIndex] = useState(0);
+  const [editor, setEditor] = useState(null); // { initial } | null
 
-  const activeMesocycle = appState.mesocycles.find(m => m.id === selectedMesoId) || appState.mesocycles[0];
-  const activeDay = activeMesocycle.days[selectedDayIndex] || activeMesocycle.days[0];
+  const handleSaveFromEditor = async (meso) => {
+    const ok = await onSaveMesocycle(meso);
+    if (ok !== false) { setSelectedMesoId(meso.id); setSelectedDayIndex(0); setEditor(null); }
+  };
+
+  const editorModal = editor && (
+    <RoutineEditor kind="meso" initial={editor.initial} videoLibrary={appState.videoLibrary}
+      onSave={handleSaveFromEditor} onClose={() => setEditor(null)} />
+  );
+
+  const activeMesocycle = mesocycles.find(m => m.id === selectedMesoId) || mesocycles[mesocycles.length - 1];
+  if (!activeMesocycle) {
+    return (
+      <div className="space-y-4 animate-fadeIn">
+        <div className="p-6 rounded-3xl bg-obsidian-card/90 border border-slate-800 space-y-3">
+          <h1 className="text-xl font-black text-white">Sin rutina asignada</h1>
+          <p className="text-sm text-slate-400">
+            {isCoach
+              ? `${appState.activeStudent?.name || 'Este alumno'} todavía no tiene mesociclos. Asignale una plantilla o armá una rutina desde cero.`
+              : 'Tu profe todavía no te asignó una rutina.'}
+          </p>
+          {isCoach && (
+            <div className="flex flex-wrap gap-2">
+              <button onClick={() => setEditor({ initial: null })} className="btn-volt px-4 py-2.5 rounded-xl text-xs font-black">Armar rutina nueva</button>
+              <button onClick={onGoToTemplates} className="px-4 py-2.5 rounded-xl text-xs font-bold text-volt border border-volt/30">Usar una plantilla</button>
+            </div>
+          )}
+        </div>
+        {editorModal}
+      </div>
+    );
+  }
+  const activeDay = activeMesocycle.days[selectedDayIndex] || activeMesocycle.days[0] || { name: '', focus: '', blocks: [] };
 
   // Calculate day stats
   const totalExercises = activeDay.blocks.reduce((acc, b) => acc + b.exercises.length, 0);
@@ -47,7 +87,7 @@ export default function RoutinesView({ appState, setSelectedVideo, onStartWorkou
 
           {/* Mesocycle switcher buttons */}
           <div className="flex flex-wrap items-center gap-2">
-            {appState.mesocycles.map(meso => (
+            {mesocycles.map(meso => (
               <button
                 key={meso.id}
                 onClick={() => {
@@ -88,13 +128,56 @@ export default function RoutinesView({ appState, setSelectedVideo, onStartWorkou
           </div>
         </div>
 
-        <button
-          onClick={() => onStartWorkout(activeDay, activeMesocycle.name)}
-          className="btn-volt flex items-center justify-center gap-2 px-5 py-3 rounded-2xl text-xs font-black shadow-lg shadow-volt/25 hover:scale-[1.02] transition-transform"
-        >
-          <Dumbbell className="w-4 h-4 stroke-[3]" />
-          <span>INICIAR ESTE DÍA EN VIVO</span>
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          {isCoach && (
+            <>
+              <button onClick={() => setEditor({ initial: activeMesocycle })} className="flex items-center gap-1.5 px-3 py-2.5 rounded-2xl text-xs font-bold text-slate-200 border border-slate-700 hover:border-volt/50">
+                <Edit2 className="w-3.5 h-3.5" aria-hidden="true" />Editar
+              </button>
+              <button
+                onClick={() => setEditor({ initial: { ...activeMesocycle, id: newId('meso'), name: `${activeMesocycle.name} (copia)`, days: cloneDays(activeMesocycle.days) } })}
+                className="flex items-center gap-1.5 px-3 py-2.5 rounded-2xl text-xs font-bold text-slate-200 border border-slate-700 hover:border-volt/50"
+                title="Crear el próximo mesociclo a partir de este"
+              >
+                <Copy className="w-3.5 h-3.5" aria-hidden="true" />Duplicar
+              </button>
+              <button
+                onClick={() => onSaveTemplate({
+                  id: newId('tmpl'), name: activeMesocycle.name.split('(')[0].split('—')[0].trim() || 'Plantilla',
+                  category: 'Personalizada', level: 'A medida', durationWeeks: 4,
+                  description: activeMesocycle.focus || '', days: cloneDays(activeMesocycle.days),
+                  daysCount: activeMesocycle.days.length,
+                  totalExercises: activeMesocycle.days.reduce((a, d) => a + d.blocks.reduce((x, b) => x + b.exercises.length, 0), 0)
+                })}
+                className="flex items-center gap-1.5 px-3 py-2.5 rounded-2xl text-xs font-bold text-slate-200 border border-slate-700 hover:border-volt/50"
+              >
+                <BookmarkPlus className="w-3.5 h-3.5" aria-hidden="true" />Guardar como plantilla
+              </button>
+              <button
+                onClick={() => {
+                  if (window.confirm(`¿Eliminar "${activeMesocycle.name}"? No se puede deshacer.`)) {
+                    onDeleteMesocycle(activeMesocycle.id);
+                    setSelectedMesoId(null);
+                  }
+                }}
+                className="p-2.5 rounded-2xl text-slate-400 hover:text-rose-400 border border-slate-800"
+                aria-label="Eliminar mesociclo"
+              >
+                <Trash2 className="w-3.5 h-3.5" aria-hidden="true" />
+              </button>
+              <button onClick={() => setEditor({ initial: null })} className="flex items-center gap-1.5 px-3 py-2.5 rounded-2xl text-xs font-bold text-volt border border-volt/30">
+                <Plus className="w-3.5 h-3.5" aria-hidden="true" />Nueva
+              </button>
+            </>
+          )}
+          <button
+            onClick={() => onStartWorkout(activeDay, activeMesocycle.name)}
+            className="btn-volt flex items-center justify-center gap-2 px-5 py-3 rounded-2xl text-xs font-black shadow-lg shadow-volt/25 hover:scale-[1.02] transition-transform"
+          >
+            <Dumbbell className="w-4 h-4 stroke-[3]" aria-hidden="true" />
+            <span>INICIAR ESTE DÍA EN VIVO</span>
+          </button>
+        </div>
       </div>
 
       {/* Days of Week Tab Buttons */}
@@ -240,6 +323,7 @@ export default function RoutinesView({ appState, setSelectedVideo, onStartWorkou
           ))}
         </div>
       </div>
+      {editorModal}
     </div>
   );
 }

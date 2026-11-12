@@ -15,7 +15,7 @@ import {
   LineChart
 } from 'lucide-react';
 
-export default function StrengthProgressView({ appState, onAddStrengthLog }) {
+export default function StrengthProgressView({ appState, onAddStrengthLog, currentRole }) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedExerciseFilter, setSelectedExerciseFilter] = useState('totalKilos');
 
@@ -29,12 +29,13 @@ export default function StrengthProgressView({ appState, onAddStrengthLog }) {
   const safeReps = Math.max(1, Math.round(Number(calcReps) || 1));
   const estimated1RM = safeReps === 1 ? Math.round(safeWeight) : Math.round(safeWeight * (1 + safeReps / 30));
 
-  const strengthLogs = appState.strengthProgression;
+  const strengthLogs = appState.scoped.strengthProgression;
+  const DATA_EMPTY = strengthLogs.length === 0;
   const firstLog = strengthLogs[0];
   const latestLog = strengthLogs[strengthLogs.length - 1];
 
-  const totalGain = latestLog.totalKilos - firstLog.totalKilos;
-  const percentGain = Math.round((totalGain / firstLog.totalKilos) * 100);
+  const totalGain = latestLog && firstLog ? latestLog.totalKilos - firstLog.totalKilos : 0;
+  const percentGain = firstLog?.totalKilos ? Math.round((totalGain / firstLog.totalKilos) * 100) : 0;
 
   // Form state
   const [newMonthName, setNewMonthName] = useState(`Mes ${strengthLogs.length + 1}`);
@@ -80,12 +81,12 @@ export default function StrengthProgressView({ appState, onAddStrengthLog }) {
   ];
 
   const exercises = [
-    { key: 'sentadillaProfunda', label: 'Sentadilla Profunda', start: firstLog.sentadillaProfunda, current: latestLog.sentadillaProfunda },
-    { key: 'sentadillaMedia', label: 'Sentadilla Media', start: firstLog.sentadillaMedia, current: latestLog.sentadillaMedia },
-    { key: 'pesoMuerto', label: 'Peso Muerto', start: firstLog.pesoMuerto, current: latestLog.pesoMuerto },
-    { key: 'pressPlano', label: 'Press Banco Plano', start: firstLog.pressPlano, current: latestLog.pressPlano },
-    { key: 'remoBarra', label: 'Remo con Barra', start: firstLog.remoBarra, current: latestLog.remoBarra },
-    { key: 'despegueHex', label: 'Despegue Hexagonal', start: firstLog.despegueHex, current: latestLog.despegueHex }
+    { key: 'sentadillaProfunda', label: 'Sentadilla Profunda', start: firstLog?.sentadillaProfunda, current: latestLog?.sentadillaProfunda },
+    { key: 'sentadillaMedia', label: 'Sentadilla Media', start: firstLog?.sentadillaMedia, current: latestLog?.sentadillaMedia },
+    { key: 'pesoMuerto', label: 'Peso Muerto', start: firstLog?.pesoMuerto, current: latestLog?.pesoMuerto },
+    { key: 'pressPlano', label: 'Press Banco Plano', start: firstLog?.pressPlano, current: latestLog?.pressPlano },
+    { key: 'remoBarra', label: 'Remo con Barra', start: firstLog?.remoBarra, current: latestLog?.remoBarra },
+    { key: 'despegueHex', label: 'Despegue Hexagonal', start: firstLog?.despegueHex, current: latestLog?.despegueHex }
   ];
 
   // SVG Chart calculation
@@ -149,6 +150,7 @@ export default function StrengthProgressView({ appState, onAddStrengthLog }) {
             </p>
           </div>
 
+          {currentRole === 'coach' && (
           <button
             onClick={() => { setNewMonthName(`Mes ${strengthLogs.length + 1}`); setIsModalOpen(true); }}
             className="btn-volt flex items-center justify-center gap-2 px-5 py-3 rounded-2xl text-xs font-black shadow-lg shadow-volt/20 hover:scale-[1.02] transition-all self-start md:self-auto"
@@ -156,9 +158,16 @@ export default function StrengthProgressView({ appState, onAddStrengthLog }) {
             <Plus className="w-4 h-4 stroke-[3]" />
             <span>NUEVO TEST DE FUERZA</span>
           </button>
+          )}
         </div>
       </div>
 
+      {DATA_EMPTY ? (
+        <div className="p-6 rounded-3xl bg-obsidian-card/90 border border-dashed border-slate-700 text-center space-y-2">
+          <p className="text-sm font-bold text-white">Todavía no hay registros de fuerza para {appState.activeStudent?.name || 'este alumno'}.</p>
+          <p className="text-xs text-slate-400">{currentRole === 'coach' ? 'Cargá el primer registro con el botón de arriba.' : 'Tu profe va a cargar tus registros.'}</p>
+        </div>
+      ) : (<>
       {/* Main Stats Banner & 1RM Calculator */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left Stats Box */}
@@ -183,7 +192,7 @@ export default function StrengthProgressView({ appState, onAddStrengthLog }) {
               </div>
             </div>
             <p className="text-xs text-slate-400 mt-3 max-w-md">
-              Evolución desde <strong className="text-white">{firstLog.totalKilos} kg</strong> iniciales en el Mes 1. Gran incremento en miembros inferiores y tracciones del Prof. Larroca.
+              Evolución desde <strong className="text-white">{firstLog.totalKilos} kg</strong> iniciales en {firstLog.mes} hasta {latestLog.mes} ({strengthLogs.length} registros).
             </p>
           </div>
 
@@ -524,6 +533,8 @@ export default function StrengthProgressView({ appState, onAddStrengthLog }) {
           </table>
         </div>
       </div>
+
+      </>)}
 
       {/* Modal: Registrar Nuevo Test Mensual */}
       {isModalOpen && (

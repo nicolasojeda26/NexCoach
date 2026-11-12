@@ -27,9 +27,29 @@ function loadSession(dayId) {
   } catch (e) { return null; }
 }
 
-export default function WorkoutView({ appState, setSelectedVideo, activeWorkoutDay, mesoName, onSaveSession, onExit }) {
-  const currentMeso = appState.mesocycles[0];
-  const currentDay = activeWorkoutDay || currentMeso.days[0];
+export default function WorkoutView(props) {
+  const { appState, onGoToRoutines } = props;
+  const mesos = appState.scoped.mesocycles;
+  const currentMeso = mesos[mesos.length - 1];
+  if (!currentMeso || !currentMeso.days?.length) {
+    return (
+      <div className="p-6 rounded-3xl bg-slate-900/80 border border-slate-800 space-y-3 animate-fadeIn">
+        <h1 className="text-xl font-black text-white">Todavía no hay rutina para entrenar</h1>
+        <p className="text-sm text-slate-400">
+          {appState.activeStudent ? `${appState.activeStudent.name} no tiene un mesociclo asignado.` : 'No hay alumnos cargados.'} El profe puede
+          asignar una plantilla o armar la rutina en "Rutinas & Mesociclos".
+        </p>
+        <button onClick={onGoToRoutines} className="btn-volt px-4 py-2.5 rounded-xl text-xs font-black">Ir a Rutinas</button>
+      </div>
+    );
+  }
+  return <WorkoutSession {...props} currentMeso={currentMeso} />;
+}
+
+function WorkoutSession({ appState, setSelectedVideo, activeWorkoutDay, mesoName, onSaveSession, onExit, currentMeso }) {
+  // Si no eligió un día desde Rutinas, se propone el que corresponde a hoy (lunes = día 1).
+  const dow = (new Date().getDay() + 6) % 7;
+  const currentDay = activeWorkoutDay || currentMeso.days[dow < 5 ? dow % currentMeso.days.length : 0];
   const [saved] = useState(() => loadSession(currentDay.id));
 
   // State of completed sets: key: "exId-roundIndex", val: boolean
@@ -124,7 +144,7 @@ export default function WorkoutView({ appState, setSelectedVideo, activeWorkoutD
     onSaveSession?.({
       id: `session-${Date.now()}`,
       date: todayISO(),
-      studentId: appState.students[0]?.id,
+      studentId: appState.activeStudent?.id,
       mesoName: mesoName || currentMeso.name,
       dayName: currentDay.name,
       focus: currentDay.focus,
@@ -194,7 +214,7 @@ export default function WorkoutView({ appState, setSelectedVideo, activeWorkoutD
           </div>
           <h2 className="text-xl font-black text-white">¡Entrenamiento del Día Finalizado! 💪🎉</h2>
           <p className="text-xs text-slate-300 max-w-md mx-auto leading-relaxed">
-            Completaste la sesión en <strong>{formatElapsed(elapsedSeconds)}</strong>. Registra tu escala de fatiga (RPE) para el Prof. Nicolás Larroca.
+            Completaste la sesión en <strong>{formatElapsed(elapsedSeconds)}</strong>. Registrá tu escala de esfuerzo (RPE) para {appState.coach.name ? `el Prof. ${appState.coach.name}` : 'tu profe'}.
           </p>
 
           {/* RPE Touch Slider */}

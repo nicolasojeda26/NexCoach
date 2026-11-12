@@ -95,3 +95,23 @@ export function getYouTubeId(url = '') {
   const m = String(url).match(/(?:youtube\.com\/(?:shorts\/|embed\/|watch\?(?:.*&)?v=)|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
   return m ? m[1] : null;
 }
+
+// Suma días a una fecha ISO (YYYY-MM-DD) en hora local.
+export function addDaysISO(iso, days = 1) {
+  const [y, m, d] = iso.split('-').map(Number);
+  const date = new Date(y, m - 1, d + days);
+  const mm = String(date.getMonth() + 1).padStart(2, '0');
+  const dd = String(date.getDate()).padStart(2, '0');
+  return `${date.getFullYear()}-${mm}-${dd}`;
+}
+
+// Lunes de la semana de una fecha ISO.
+export function weekStartISO(iso) {
+  const [y, m, d] = iso.split('-').map(Number);
+  const date = new Date(y, m - 1, d);
+  const dow = (date.getDay() + 6) % 7; // 0 = lunes
+  return addDaysISO(iso, -dow);
+}
+
+// "YYYY-MM" de una fecha ISO.
+export const monthKeyISO = (iso) => iso.slice(0, 7);

@@ -1,4 +1,6 @@
-import React, { useRef } from 'react';
+import React, { useState, useEffect } from 'react';
+import Avatar from './Avatar';
+import { useEscape } from '../hooks/useEscape';
 import {
   X,
   Printer,
@@ -13,15 +15,41 @@ import {
   Ruler
 } from 'lucide-react';
 
-export default function ReportModal({ isOpen, onClose, appState }) {
-  if (!isOpen) return null;
+// Conclusión armada con los datos reales; el profe la puede editar antes de imprimir.
+function buildConclusion(student, anthropometry, strengthLogs, progress) {
+  if (!student) return '';
+  const parts = [`${student.name.split(' ')[0]} registró ${progress.sessionsCount} sesiones, con ${progress.attendancePct}% de asistencia en las últimas 4 semanas.`];
+  if (anthropometry.length > 1) {
+    const a = anthropometry[0]; const b = anthropometry[anthropometry.length - 1];
+    const d = (k) => Math.round((b[k] - a[k]) * 10) / 10;
+    const fmt = (v) => `${v > 0 ? '+' : ''}${v} cm`;
+    parts.push(`Respecto a ${a.mesociclo}: abdomen ${fmt(d('abdomen'))}, muslos ${fmt(d('muslos'))} y glúteos ${fmt(d('gluteos'))}.`);
+  }
+  if (strengthLogs.length > 1) {
+    const a = strengthLogs[0].totalKilos; const b = strengthLogs[strengthLogs.length - 1].totalKilos;
+    if (a > 0) parts.push(`El volumen en los levantamientos principales pasó de ${a} kg a ${b} kg (${Math.round(((b - a) / a) * 100)}%).`);
+  }
+  parts.push('Se recomienda continuar con el próximo mesociclo según los objetivos acordados.');
+  return parts.join(' ');
+}
 
-  const student = appState.students[0]; // Agostina Baju
+const signed = (v) => `${v > 0 ? '+' : ''}${v.toFixed(1)}`;
+
+export default function ReportModal({ isOpen, onClose, appState }) {
+  const student = appState.activeStudent;
+  const [conclusion, setConclusion] = useState('');
+  useEffect(() => {
+    if (isOpen) setConclusion(buildConclusion(student, appState.scoped.anthropometry, appState.scoped.strengthProgression, appState.progress));
+  }, [isOpen, student?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEscape(isOpen, onClose);
+  if (!isOpen) return null;
+  if (!student) return null;
+
   const coach = appState.coach;
-  const anthropometry = appState.anthropometry;
+  const anthropometry = appState.scoped.anthropometry;
   const firstMeso = anthropometry[0];
   const lastMeso = anthropometry[anthropometry.length - 1];
-  const strengthLogs = appState.strengthProgression;
+  const strengthLogs = appState.scoped.strengthProgression;
   const firstLog = strengthLogs[0];
   const latestLog = strengthLogs[strengthLogs.length - 1];
 
@@ -103,18 +131,14 @@ export default function ReportModal({ isOpen, onClose, appState }) {
           <div className="p-4 rounded-2xl bg-slate-950/70 border border-slate-800 print:bg-slate-50 print:border-slate-200">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div className="flex items-center gap-3.5">
-                <img
-                  src={student.avatar}
-                  alt={student.name}
-                  className="w-14 h-14 rounded-2xl object-cover ring-2 ring-emerald-500/30"
-                />
+                <Avatar student={student} className="w-14 h-14 rounded-2xl ring-2 ring-emerald-500/30" />
                 <div>
                   <h2 className="text-lg font-black text-white print:text-black">{student.name}</h2>
                   <p className="text-xs text-slate-400 print:text-slate-600">
                     {student.age} años • {student.gender} • Altura: {student.height} cm • Peso Actual: <strong>{student.currentWeight} kg</strong>
                   </p>
                   <p className="text-[11px] text-emerald-400 print:text-emerald-700 font-semibold mt-0.5">
-                    Objetivo: Hipertrofia tren inferior, ganancia de fuerza e IMC meta de {student.targetIMC}
+                    Objetivo: {student.notes || 'Acondicionamiento físico'} • IMC meta {student.targetIMC}
                   </p>
                 </div>
               </div>
@@ -126,7 +150,7 @@ export default function ReportModal({ isOpen, onClose, appState }) {
                 </div>
                 <div className="p-2 rounded-xl bg-slate-900 border border-slate-800 print:bg-white print:border-slate-300">
                   <span className="text-[10px] text-slate-400 print:text-slate-500 block">Asistencia</span>
-                  <span className="text-sm font-black text-white print:text-black">95%</span>
+                  <span className="text-sm font-black text-white print:text-black">{appState.progress.attendancePct}%</span>
                 </div>
               </div>
             </div>
@@ -167,16 +191,18 @@ export default function ReportModal({ isOpen, onClose, appState }) {
                     </tr>
                   ))}
                   {/* Delta row */}
+                  {lastMeso && anthropometry.length > 1 && (
                   <tr className="bg-emerald-500/10 print:bg-emerald-50 font-black text-emerald-400 print:text-emerald-800">
                     <td className="py-2 px-3">VARIACIÓN (Δ)</td>
-                    <td className="py-2 px-3">{(lastMeso.gemelos - firstMeso.gemelos).toFixed(1)} cm</td>
-                    <td className="py-2 px-3">+{(lastMeso.muslos - firstMeso.muslos).toFixed(1)} cm</td>
-                    <td className="py-2 px-3">{(lastMeso.gluteos - firstMeso.gluteos).toFixed(1)} cm</td>
-                    <td className="py-2 px-3">{(lastMeso.abdomen - firstMeso.abdomen).toFixed(1)} cm</td>
-                    <td className="py-2 px-3">{(lastMeso.hombros - firstMeso.hombros).toFixed(1)} cm</td>
-                    <td className="py-2 px-3">{(lastMeso.biceps - firstMeso.biceps).toFixed(1)} cm</td>
-                    <td className="py-2 px-3">{(lastMeso.pecho - firstMeso.pecho).toFixed(1)} cm</td>
+                    <td className="py-2 px-3">{signed(lastMeso.gemelos - firstMeso.gemelos)} cm</td>
+                    <td className="py-2 px-3">{signed(lastMeso.muslos - firstMeso.muslos)} cm</td>
+                    <td className="py-2 px-3">{signed(lastMeso.gluteos - firstMeso.gluteos)} cm</td>
+                    <td className="py-2 px-3">{signed(lastMeso.abdomen - firstMeso.abdomen)} cm</td>
+                    <td className="py-2 px-3">{signed(lastMeso.hombros - firstMeso.hombros)} cm</td>
+                    <td className="py-2 px-3">{signed(lastMeso.biceps - firstMeso.biceps)} cm</td>
+                    <td className="py-2 px-3">{signed(lastMeso.pecho - firstMeso.pecho)} cm</td>
                   </tr>
+                  )}
                 </tbody>
               </table>
             </div>
@@ -218,20 +244,22 @@ export default function ReportModal({ isOpen, onClose, appState }) {
             <span className="text-xs font-bold text-emerald-400 print:text-emerald-800 uppercase tracking-wider block">
               3. Dictamen y Conclusiones del Preparador Físico:
             </span>
-            <p className="text-xs text-slate-300 print:text-slate-700 leading-relaxed">
-              "Agostina ha demostrado una adherencia sobresaliente al plan de entrenamiento. Se evidencia una reducción de abdomen bajo (-11 cm respecto al inicio) acompañada de hipertrofia notable en cuádriceps (+3 cm en muslos) y estabilización de glúteos en 96 cm. La fuerza en levantamientos compuestos creció un 48% con técnica validada mediante video. Se recomienda continuar con el Mesociclo 7 enfocado en hipertrofia avanzada."
-            </p>
+            <label className="sr-only" htmlFor="report-conclusion">Conclusión del informe</label>
+            <textarea id="report-conclusion" rows="4" value={conclusion} onChange={(e) => setConclusion(e.target.value)}
+              className="print:hidden w-full p-2.5 rounded-xl bg-slate-900 border border-slate-700 text-xs text-slate-200 leading-relaxed focus:outline-none focus:border-emerald-500" />
+            <p className="hidden print:block text-xs text-slate-700 leading-relaxed">"{conclusion}"</p>
+            <p className="print:hidden text-[10px] text-slate-500">Podés editar este texto antes de imprimir.</p>
 
             <div className="pt-4 flex items-center justify-between border-t border-slate-800/80 print:border-slate-300 text-xs">
               <div>
                 <span className="text-[10px] text-slate-400 print:text-slate-500 block">Firma Digital Registrada:</span>
-                <strong className="text-emerald-400 print:text-emerald-800">Prof. Nicolás Larroca</strong>
-                <span className="text-[10px] text-slate-400 print:text-slate-500 block">Preparador Físico & Director NexCoach</span>
+                <strong className="text-emerald-400 print:text-emerald-800">Prof. {coach.name}</strong>
+                <span className="text-[10px] text-slate-400 print:text-slate-500 block">{coach.role}</span>
               </div>
               <div className="text-right">
                 <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-400 print:text-emerald-800 font-bold text-[10px] border border-emerald-500/30">
                   <CheckCircle2 className="w-3 h-3" />
-                  Certificado Aprobado
+                  Informe verificado
                 </span>
               </div>
             </div>

@@ -61,7 +61,7 @@ export default function BottomNav({ currentTab, setCurrentTab, currentRole, appS
   ] : [
     { id: 'dashboard', label: 'Resumen General', icon: LayoutDashboard },
     { id: 'feedback', label: 'Corrección de Video', icon: MessageSquare },
-    { id: 'anthropometry', label: 'Medidas (12 Mesociclos)', icon: Ruler },
+    { id: 'anthropometry', label: 'Mis Medidas', icon: Ruler },
     { id: 'strength', label: 'Fuerza & RMs', icon: TrendingUp },
     { id: 'videos', label: 'Videoteca de Técnica', icon: Video }
   ];
@@ -115,6 +115,7 @@ export default function BottomNav({ currentTab, setCurrentTab, currentRole, appS
                 return (
                   <button
                     key={sub.id}
+                    aria-current={isActive ? 'page' : undefined}
                     onClick={() => {
                       setCurrentTab(sub.id);
                       setShowMoreMenu(false);
@@ -136,7 +137,7 @@ export default function BottomNav({ currentTab, setCurrentTab, currentRole, appS
       )}
 
       {/* Fixed Bottom Navigation Bar for Mobile */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-slate-950/92 backdrop-blur-xl border-t border-slate-800/80 bottom-nav-safe">
+      <nav aria-label="Navegación principal" className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-slate-950/92 backdrop-blur-xl border-t border-slate-800/80 bottom-nav-safe">
         <div className="flex items-center justify-around px-2 py-1.5">
           {items.map(item => {
             const Icon = item.icon;
@@ -147,6 +148,8 @@ export default function BottomNav({ currentTab, setCurrentTab, currentRole, appS
               <button
                 key={item.id}
                 onClick={() => handleItemClick(item)}
+                aria-current={isActive ? 'page' : undefined}
+                aria-expanded={item.isMore ? showMoreMenu : undefined}
                 className={`relative flex flex-col items-center justify-center flex-1 py-1 px-1 rounded-2xl transition-all ${
                   item.highlight
                     ? 'text-volt-neon'

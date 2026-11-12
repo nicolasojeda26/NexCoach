@@ -1,50 +1,36 @@
+// Modo demo / sin nube: el estado completo se guarda en el navegador.
 import { INITIAL_DATA } from './initialData';
+import { migrateState } from '../domain/model';
 
 const STORAGE_KEY = 'nexcoach_app_state_v1';
-
-// Copia profunda para que los datos de demo originales nunca se muten.
-const freshInitial = () => JSON.parse(JSON.stringify(INITIAL_DATA));
-
-// Completa con valores por defecto las claves que falten en un estado guardado por
-// una versión anterior de la app (evita pantallas rotas al agregar módulos nuevos).
-function withDefaults(saved) {
-  const base = freshInitial();
-  if (!saved || typeof saved !== 'object') return base;
-  const merged = { ...base, ...saved };
-  merged.coach = { ...base.coach, ...(saved.coach || {}) };
-  merged.habitsData = { ...base.habitsData, ...(saved.habitsData || {}) };
-  merged.gamification = { ...base.gamification, ...(saved.gamification || {}) };
-  if (!Array.isArray(merged.workoutLogs)) merged.workoutLogs = [];
-  ['students', 'payments', 'mesocycles', 'videoLibrary', 'anthropometry', 'strengthProgression', 'plans']
-    .forEach(k => { if (!Array.isArray(merged[k]) || merged[k].length === 0) merged[k] = base[k]; });
-  return merged;
-}
 
 export function loadAppState() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) {
-      const initial = withDefaults(null);
+      const initial = migrateState(INITIAL_DATA, { seedDemo: true });
       saveAppState(initial);
       return initial;
     }
-    return withDefaults(JSON.parse(raw));
+    return migrateState(JSON.parse(raw));
   } catch (e) {
     console.error("Error loading app state from storage:", e);
-    return withDefaults(null);
+    return migrateState(INITIAL_DATA, { seedDemo: true });
   }
 }
 
 export function saveAppState(state) {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    return true;
   } catch (e) {
     console.error("Error saving app state to storage:", e);
+    return false;
   }
 }
 
 export function resetAppState() {
-  const initial = withDefaults(null);
+  const initial = migrateState(INITIAL_DATA, { seedDemo: true });
   saveAppState(initial);
   try {
     Object.keys(localStorage)
