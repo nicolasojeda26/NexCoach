@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">NexCoach</string>
+    <string name="title_activity_main">NexCoach</string>
+    <string name="package_name">com.litoraldev.nexcoach</string>
+    <string name="custom_url_scheme">com.litoraldev.nexcoach</string>
+</resources>

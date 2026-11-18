@@ -36,8 +36,8 @@ export default {
         }
       },
       fontFamily: {
-        sans: ['"Plus Jakarta Sans"', 'system-ui', 'sans-serif'],
-        display: ['"Plus Jakarta Sans"', 'system-ui', 'sans-serif'],
+        sans: ['"Plus Jakarta Sans Variable"', '"Plus Jakarta Sans"', 'system-ui', 'sans-serif'],
+        display: ['"Plus Jakarta Sans Variable"', '"Plus Jakarta Sans"', 'system-ui', 'sans-serif'],
       },
       boxShadow: {
         'volt-sm': '0 0 15px rgba(16, 245, 155, 0.25)',

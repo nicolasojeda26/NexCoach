@@ -105,7 +105,7 @@ export default function Sidebar({ currentTab, setCurrentTab, currentRole, appSta
               key={item.id}
               onClick={() => setCurrentTab(item.id)}
               aria-current={isActive ? 'page' : undefined}
-              className={`flex items-center justify-between px-3.5 py-2.5 rounded-2xl font-semibold text-xs md:text-sm whitespace-nowrap transition-all ${
+              className={`flex items-center justify-between w-full gap-1 px-3.5 py-2.5 min-h-[44px] rounded-2xl font-semibold text-xs md:text-sm whitespace-nowrap transition-all ${
                 isActive
                   ? 'bg-volt text-obsidian font-black shadow-lg shadow-volt/20 scale-[1.02]'
                   : item.highlight
@@ -113,12 +113,12 @@ export default function Sidebar({ currentTab, setCurrentTab, currentRole, appSta
                   : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
               }`}
             >
-              <div className="flex items-center gap-3">
-                <Icon aria-hidden="true" className={`w-4 h-4 md:w-5 md:h-5 ${isActive ? 'text-obsidian' : item.highlight ? 'text-volt' : 'text-slate-400'}`} />
-                <span>{item.label}</span>
+              <div className="flex items-center gap-3 min-w-0">
+                <Icon aria-hidden="true" className={`w-4 h-4 md:w-5 md:h-5 shrink-0 ${isActive ? 'text-obsidian' : item.highlight ? 'text-volt' : 'text-slate-400'}`} />
+                <span className="truncate">{item.label}</span>
               </div>
               {item.badge && (
-                <span className={`px-2 py-0.5 rounded-full text-[11px] font-mono font-bold ${
+                <span className={`shrink-0 ml-2 px-2 py-0.5 rounded-full text-[11px] font-mono font-bold ${
                   isActive ? 'bg-obsidian text-volt' : 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
                 }`}>
                   {item.badge}

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Timer, Play, Pause, RotateCcw, Volume2, Plus, Minus, Bell } from 'lucide-react';
+import { vibrate } from '../platform/native';
 
 // Un único AudioContext reutilizado: los navegadores limitan la cantidad de contextos
 // y, si se crea uno por pitido, el sonido deja de funcionar después de unos minutos.
@@ -35,9 +36,9 @@ export default function RestTimer() {
   const [secondsLeft, setSecondsLeft] = useState(60);
   const [initialDuration, setInitialDuration] = useState(60);
   const [isRunning, setIsRunning] = useState(false);
-  // En celular arranca minimizado para no tapar el contenido ni la barra inferior.
+  // En celular y tablet arranca minimizado para no tapar el contenido (se abre tocando el reloj).
   const [isMinimized, setIsMinimized] = useState(
-    () => typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches
+    () => typeof window !== 'undefined' && (window.matchMedia('(max-width: 1279px)').matches || window.matchMedia('(pointer: coarse)').matches)
   );
   const timerRef = useRef(null);
 
@@ -57,7 +58,7 @@ export default function RestTimer() {
       setIsRunning(false);
       playBeep(880, 0.2);
       setTimeout(() => playBeep(1174, 0.4), 250);
-      if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+      vibrate('warning');
     } else if (secondsLeft <= 3) {
       playBeep(659, 0.1);
     }

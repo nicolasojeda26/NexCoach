@@ -1,0 +1,35 @@
+{
+  "appId": "com.litoraldev.nexcoach",
+  "appName": "NexCoach",
+  "webDir": "dist",
+  "loggingBehavior": "production",
+  "server": {
+    "androidScheme": "https"
+  },
+  "android": {
+    "backgroundColor": "#04070e",
+    "allowMixedContent": false,
+    "captureInput": true,
+    "webContentsDebuggingEnabled": false
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 3000,
+      "launchAutoHide": false,
+      "backgroundColor": "#04070e",
+      "androidScaleType": "CENTER_CROP",
+      "showSpinner": false,
+      "splashFullScreen": false,
+      "splashImmersive": false
+    },
+    "StatusBar": {
+      "style": "DARK",
+      "backgroundColor": "#04070e",
+      "overlaysWebView": false
+    },
+    "Keyboard": {
+      "resize": "native",
+      "resizeOnFullScreen": true
+    }
+  }
+}

@@ -15,6 +15,7 @@ import {
   UserCheck
 } from 'lucide-react';
 import { getYouTubeId, todayISO } from '../utils/helpers';
+import { useEscape } from '../hooks/useEscape';
 
 export default function TechniqueFeedbackView({ appState, currentRole, onAddSubmission, onReviewSubmission, setSelectedVideo, uploadFile, mode }) {
   const [videoFile, setVideoFile] = useState(null);
@@ -24,6 +25,8 @@ export default function TechniqueFeedbackView({ appState, currentRole, onAddSubm
   const student = appState.activeStudent;
   const [isSubmitModalOpen, setIsSubmitModalOpen] = useState(false);
   const [selectedReviewItem, setSelectedReviewItem] = useState(null);
+  useEscape(isSubmitModalOpen, () => setIsSubmitModalOpen(false));
+  useEscape(Boolean(selectedReviewItem), () => setSelectedReviewItem(null));
 
   // Student upload form
   const [exerciseName, setExerciseName] = useState('Sentadilla Profunda');

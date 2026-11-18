@@ -9,6 +9,9 @@ import PRBadgesModal from './components/PRBadgesModal';
 import PWAInstallBanner from './components/PWAInstallBanner';
 import AuthScreen from './components/AuthScreen';
 import Toast from './components/Toast';
+import AppStatusBar from './components/AppStatusBar';
+import { setRootBackHandler } from './platform/backStack';
+import { keepScreenOn } from './platform/native';
 
 import DashboardView from './views/DashboardView';
 import StudentsView from './views/StudentsView';
@@ -48,7 +51,19 @@ function MainApp({ data }) {
   const isCloud = mode === 'cloud';
   const lockedRole = isCloud ? profile?.role : null; // en la nube el rol lo define la cuenta
 
-  const [currentTab, setCurrentTab] = useState('dashboard');
+  // Accesos directos del ícono (mantener presionado): /?tab=workout, /?tab=payments
+  const [currentTab, setCurrentTabRaw] = useState(() => {
+    try {
+      const t = new URLSearchParams(window.location.search).get('tab');
+      return t && (STUDENT_TABS.has(t) || ['templates', 'students'].includes(t)) ? t : 'dashboard';
+    } catch (e) { return 'dashboard'; }
+  });
+  const setCurrentTab = useCallback((t) => {
+    setCurrentTabRaw(t);
+    // Cada pantalla arranca desde arriba (en el celular quedaba scrolleada a la mitad).
+    window.scrollTo({ top: 0 });
+    document.getElementById('contenido')?.scrollTo?.({ top: 0 });
+  }, []);
   const [demoRole, setDemoRole] = useState('coach');
   const currentRole = lockedRole || demoRole;
   const [selectedVideo, setSelectedVideo] = useState(null);
@@ -111,6 +126,31 @@ function MainApp({ data }) {
     const techniqueSubmissions = currentRole === 'student' ? scoped.techniqueSubmissions : state.techniqueSubmissions;
     return { ...state, payments, students, techniqueSubmissions, activeStudent, scoped, studentPlan, habitsDoc, progress };
   }, [state, activeStudentId, currentRole]);
+
+  // Botón "Atrás" de Android: desde cualquier pantalla vuelve al inicio; en el inicio sale.
+  useEffect(() => setRootBackHandler(() => {
+    if (currentTab !== 'dashboard') { setCurrentTab('dashboard'); return true; }
+    return false;
+  }), [currentTab, setCurrentTab]);
+
+  // La pantalla no se apaga mientras se entrena.
+  useEffect(() => {
+    keepScreenOn(currentTab === 'workout');
+    return () => { keepScreenOn(false); };
+  }, [currentTab]);
+
+  // Aviso al volver de Mercado Pago (?mp=ok|pending|error)
+  useEffect(() => {
+    try {
+      const mp = new URLSearchParams(window.location.search).get('mp');
+      if (!mp) return;
+      if (mp === 'ok') notify('¡Pago acreditado! La cuota se marca pagada en unos segundos.');
+      else if (mp === 'pending') notify('El pago quedó pendiente. Te avisamos cuando se acredite.');
+      else notify('El pago no se completó. Podés intentar de nuevo o pagar por transferencia.', 'error');
+      setCurrentTab('payments');
+      window.history.replaceState(window.history.state, '', window.location.pathname);
+    } catch (e) { /* noop */ }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleRoleChange = (role) => {
     setDemoRole(role);
@@ -219,6 +259,7 @@ function MainApp({ data }) {
       <a href="#contenido" className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[100] focus:px-3 focus:py-2 focus:rounded-lg focus:bg-emerald-500 focus:text-slate-950 focus:font-bold">
         Saltar al contenido
       </a>
+      <AppStatusBar />
       <PWAInstallBanner />
 
       <Navbar

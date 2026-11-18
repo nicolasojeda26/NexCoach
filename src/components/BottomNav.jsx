@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useEscape } from '../hooks/useEscape';
 import {
   LayoutDashboard,
   Dumbbell,
@@ -19,6 +20,7 @@ import {
 
 export default function BottomNav({ currentTab, setCurrentTab, currentRole, appState, onOpenReport, onOpenBadges }) {
   const [showMoreMenu, setShowMoreMenu] = useState(false);
+  useEscape(showMoreMenu, () => setShowMoreMenu(false));
   const pendingCount = appState.payments.filter(p => p.status === 'overdue' || p.status === 'pending').length;
   const pendingReviews = (appState.techniqueSubmissions || []).filter(s => s.status === 'pending').length;
 

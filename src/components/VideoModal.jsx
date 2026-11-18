@@ -1,14 +1,9 @@
-import React, { useEffect } from 'react';
+import React from 'react';
+import { useEscape } from '../hooks/useEscape';
 import { X, ExternalLink, Play, Lightbulb } from 'lucide-react';
 
 export default function VideoModal({ video, onClose }) {
-  // Cerrar con la tecla Escape
-  useEffect(() => {
-    if (!video) return undefined;
-    const onKey = (e) => { if (e.key === 'Escape') onClose(); };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [video, onClose]);
+  useEscape(Boolean(video), onClose);
 
   if (!video) return null;
 

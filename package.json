@@ -7,9 +7,23 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "test:rules": "firebase emulators:exec --only firestore --project demo-nexcoach \"node --test tests/firestore.rules.test.js\""
+    "test:rules": "firebase emulators:exec --only firestore --project demo-nexcoach \"node --test tests/firestore.rules.test.js\"",
+    "build:android": "BUILD_TARGET=android vite build && cap sync android",
+    "android:apk": "npm run build:android && cd android && ./gradlew assembleRelease",
+    "android:aab": "npm run build:android && cd android && ./gradlew bundleRelease",
+    "android:open": "cap open android"
   },
   "dependencies": {
+    "@capacitor-community/keep-awake": "^7.1.0",
+    "@capacitor/android": "^7.6.10",
+    "@capacitor/app": "^7.1.2",
+    "@capacitor/browser": "^7.0.5",
+    "@capacitor/core": "^7.6.10",
+    "@capacitor/haptics": "^7.0.5",
+    "@capacitor/keyboard": "^7.0.6",
+    "@capacitor/splash-screen": "^7.0.5",
+    "@capacitor/status-bar": "^7.0.6",
+    "@fontsource-variable/plus-jakarta-sans": "^5.3.0",
     "canvas-confetti": "^1.9.3",
     "firebase": "^11.10.0",
     "lucide-react": "^0.383.0",
@@ -17,6 +31,8 @@
     "react-dom": "^18.3.1"
   },
   "devDependencies": {
+    "@capacitor/assets": "^3.0.5",
+    "@capacitor/cli": "^7.6.10",
     "@firebase/rules-unit-testing": "^4.0.1",
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
@@ -24,6 +40,7 @@
     "autoprefixer": "^10.4.19",
     "postcss": "^8.4.38",
     "tailwindcss": "^3.4.3",
-    "vite": "^5.2.11"
+    "vite": "^5.2.11",
+    "vite-plugin-pwa": "^0.21.2"
   }
 }

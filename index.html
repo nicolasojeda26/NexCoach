@@ -3,28 +3,36 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <!-- Mobile-First Viewport & PWA Optimizations -->
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png" />
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+    <!-- Se permite zoom (accesibilidad); interactive-widget hace que el teclado de Android no tape los campos -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content" />
     <meta name="theme-color" content="#04070e" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="description" content="Rutinas, entrenamiento en vivo, cuotas y progreso de tus alumnos." />
+    <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <meta name="mobile-web-app-capable" content="yes" />
-    <title>NexCoach Pro — Sistema de Alto Rendimiento & Gestión PF</title>
-    
-    <!-- Google Fonts -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <meta name="apple-mobile-web-app-title" content="NexCoach" />
+    <meta name="format-detection" content="telephone=no" />
+    <title>NexCoach — Entrenamiento y Gestión</title>
     <style>
+      html, body { background: #04070e; }
       body {
-        font-family: 'Plus Jakarta Sans', sans-serif;
+        font-family: 'Plus Jakarta Sans Variable', 'Plus Jakarta Sans', system-ui, sans-serif;
         -webkit-tap-highlight-color: transparent;
         touch-action: manipulation;
+        overscroll-behavior-y: none;
       }
+      /* Pantalla de carga mientras arranca la app */
+      #boot { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; }
+      #boot img { width: 72px; height: 72px; animation: boot 1.2s ease-in-out infinite alternate; }
+      @keyframes boot { from { opacity: .45; transform: scale(.94); } to { opacity: 1; transform: scale(1); } }
     </style>
   </head>
   <body class="bg-slate-950 text-slate-100 antialiased min-h-screen selection:bg-emerald-500 selection:text-slate-950 overflow-x-hidden">
-    <div id="root"></div>
+    <div id="root"><div id="boot"><img src="/icons/icon-192.png" alt="" /></div></div>
+    <noscript>NexCoach necesita JavaScript activado.</noscript>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>
